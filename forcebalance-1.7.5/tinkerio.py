@@ -43,7 +43,7 @@ allp = ['atom', 'vdw', 'vdw14', 'vdwpr', 'hbond', 'bond', 'bond5', 'bond4',
         'pibond', 'pibond5', 'pibond4', 'metal', 'biotype', 'mmffvdw', 'mmffbond',
         'mmffbonder', 'mmffangle', 'mmffstrbnd', 'mmffopbend', 'mmfftorsion', 'mmffbci',
         'mmffpbci', 'mmffequiv', 'mmffdefstbn', 'mmffcovrad', 'mmffprop', 'mmffarom',
-        'ct', 'cp', 'delta-halgren', 'gamma-halgren'] #CT,CP,VDW tunable parameters
+        'chgtrn', 'chgpen', 'delta-halgren', 'gamma-halgren', 'bndcflux', 'angcflux'] 
 
 # All possible output from analyze's energy component breakdown.
 eckeys = ['Angle-Angle', 'Angle Bending', 'Atomic Multipoles', 'Bond Stretching', 'Charge-Charge', 
@@ -56,11 +56,11 @@ from forcebalance.output import getLogger
 logger = getLogger(__name__)
 
 pdict = {'VDW'          : {'Atom':[1], 2:'S',3:'T',4:'D'}, # Van der Waals distance, well depth, distance from bonded neighbor?
-         'CT'           : {'Atom':[1], 2:'A',3:'B'},       # Charge Transfer prefactor and exponential coefficient
-         'CP'           : {'Atom':[1], 2:'A'},             # Charge penetration parameters
+         'CHGTRN'       : {'Atom':[1], 2:'A',3:'B'},       # Charge Transfer prefactor and exponential coefficient
+         'CHGPEN'       : {'Atom':[1], 2:'C',3:'A'},       # Charge penetration core charge and damping alpha parameters
          'BOND'         : {'Atom':[1,2], 3:'K',4:'B'},     # Bond force constant and equilibrium distance (Angstrom)
-         'CFLUX-B'      : {'Atom':[1,2], 3:'B0',4:'K'},    # charge flux equilibrium distance (Angstrom) and jb
-         'CFLUX-A'      : {'Atom':[1,2,3], 4:'A',5:'K1', 6:'K2'},  # Angle force constant and equilibrium angle
+         'BNDCFLUX'     : {'Atom':[1,2], 3:'B0',4:'K'},    # charge flux equilibrium distance (Angstrom) and jb
+         'ANGCFLUX'     : {'Atom':[1,2,3], 4:'A',5:'K1', 6:'K2'},  # Angle force constant and equilibrium angle
          'ANGLE'        : {'Atom':[1,2,3], 4:'K',5:'B'},   # Angle force constant and equilibrium angle
          'STRBND'       : {'Atom':[1,2,3], 4:'K1',5:'K2'}, # Two stretch-bend force constants (usually same)
          'OPBEND'       : {'Atom':[1,2,3,4], 5:'K'},       # Out-of-plane bending force constant
@@ -363,7 +363,8 @@ class TINKER(Engine):
             LinkFile(self.abskey, "%s.key" % self.name)
         prog = os.path.join(self.tinkerpath, csplit[0])
         csplit[0] = prog
-        o = _exec(' '.join(csplit), stdin=stdin, print_to_screen=print_to_screen, print_command=print_command, rbytes=1024, **kwargs)
+        #o = _exec(' '.join(csplit), stdin=stdin, print_to_screen=print_to_screen, print_command=print_command, rbytes=1024, **kwargs)
+        o = _exec(' '.join(csplit), stdin=stdin, print_to_screen=print_to_screen, print_command=print_command, rbytes=1, **kwargs)
         # Determine the TINKER version number.
         for line in o[:10]:
             if "Version" in line:
@@ -429,6 +430,10 @@ class TINKER(Engine):
                     tk_defs['polar-eps'] = '1e-6'
             elif self.FF.amoeba_pol == 'direct':
                 tk_opts['polarization'] = 'direct'
+            elif self.FF.amoeba_pol == 'opt3':
+                tk_opts['polarization'] = 'opt3'
+            elif self.FF.amoeba_pol == 'opt4':
+                tk_opts['polarization'] = 'opt4'
             else:
                 warn_press_key("Using TINKER without explicitly specifying AMOEBA settings. Are you sure?")
             self.prm = self.FF.tinkerprm
@@ -957,10 +962,10 @@ class TINKER(Engine):
             write_key("%s-eq.key" % self.name, eq_opts, "%s.key" % self.name, md_defs)
             if verbose: printcool("Running equilibration dynamics", color=0)
             if self.pbc and pressure is not None:
-                self.calltinker("dynamic %s -k %s-eq %i %f %f 4 %f %f" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, 
-                                                                          temperature, pressure), print_to_screen=verbose)
-                #self.calltinker("dynamic_omm %s -k %s-eq %i %f %f 4 %f %f" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, 
+                #self.calltinker("dynamic %s -k %s-eq %i %f %f 4 %f %f" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, 
                 #                                                          temperature, pressure), print_to_screen=verbose)
+                self.calltinker("dynamic_omm %s -k %s-eq %i %f %f 4 %f %f N" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, 
+                                                                          temperature, pressure), print_to_screen=verbose)
             else:
                 self.calltinker("dynamic %s -k %s-eq %i %f %f 2 %f" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000,
                                                                        temperature), print_to_screen=verbose)
@@ -970,10 +975,10 @@ class TINKER(Engine):
         if verbose: printcool("Running production dynamics", color=0)
         write_key("%s-md.key" % self.name, md_opts, "%s.key" % self.name, md_defs)
         if self.pbc and pressure is not None:
-            #odyn = self.calltinker("dynamic_omm %s -k %s-md %i %f %f 4 %f %f" % (self.name, self.name, nsteps, timestep, float(nsave*timestep/1000), 
-            #                                                                 temperature, pressure), print_to_screen=verbose)
-            odyn = self.calltinker("dynamic %s -k %s-md %i %f %f 4 %f %f" % (self.name, self.name, nsteps, timestep, float(nsave*timestep/1000), 
+            odyn = self.calltinker("dynamic_omm %s -k %s-md %i %f %f 4 %f %f N" % (self.name, self.name, nsteps, timestep, float(nsave*timestep/1000), 
                                                                              temperature, pressure), print_to_screen=verbose)
+            #odyn = self.calltinker("dynamic %s -k %s-md %i %f %f 4 %f %f" % (self.name, self.name, nsteps, timestep, float(nsave*timestep/1000), 
+            #                                                                 temperature, pressure), print_to_screen=verbose)
         else:
             odyn = self.calltinker("dynamic %s -k %s-md %i %f %f 2 %f" % (self.name, self.name, nsteps, timestep, float(nsave*timestep/1000), 
                                                                           temperature), print_to_screen=verbose)
@@ -1019,7 +1024,7 @@ class TINKER(Engine):
                 dip.append([float(s[i]) for i in range(-3,0)])
             if first_shot:
                 for key in eckeys:
-                    if strip.startswith(key):
+                    if strip.startswith(key) and (len(line) > 60):
                         if key in ecomp:
                             ecomp[key].append(float(s[-2])*4.184)
                         else:
@@ -1029,7 +1034,7 @@ class TINKER(Engine):
                         havekeys.add(key)
             else:
                 for key in havekeys:
-                    if strip.startswith(key):
+                    if strip.startswith(key) and (len(line) > 60):
                         if key in ecomp:
                             ecomp[key].append(float(s[-2])*4.184)
                         else:

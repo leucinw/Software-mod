@@ -401,12 +401,15 @@ class Liquid(Target):
             link_dir_contents(os.path.join(self.root,self.rundir),os.getcwd())
             self.last_traj += [os.path.join(os.getcwd(), i) for i in self.extra_output]
             self.liquid_mol[simnum%len(self.liquid_mol)].write(self.liquid_coords, ftype='tinker' if self.engname == 'tinker' else None)
-            dir = os.path.join(self.root, self.rundir, str(temperature)+"K-"+str(pressure) + "atm")
-            for tar, temp, node in zip(liquid_tars,temperatures, nodes):
-              if (tar in dir) and (float(temp) == temperature): 
-                cmdstr = 'ssh %s "source ~/.forcebalance1.7; cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>err.log &" ' % (node, dir, self.nptpfx, self.engname, temperature, pressure)
+            wkdir = os.path.join(self.root, self.rundir, str(temperature)+"K-"+str(pressure) + "atm")
+            for tar, temp, node in zip(liquid_tars[:-1],temperatures[:-1], nodes[:-1]):
+              if (tar in wkdir) and (float(temp) == temperature): 
+                cmdstr = 'ssh %s "source ~/.forcebalanceOrganic; cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>err.log &" ' % (node, wkdir, self.nptpfx, self.engname, temperature, pressure)
                 _exec(cmdstr, copy_stderr=True, outfnm='npt.out')
-
+            for tar, temp, node in zip(liquid_tars[-1:],temperatures[-1:], nodes[-1:]):
+              if (tar in wkdir) and (float(temp) == temperature): 
+                cmdstr = 'cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>err.log & ' % (wkdir, self.nptpfx, self.engname, temperature, pressure)
+                _exec(cmdstr, copy_stderr=True, outfnm='npt.out')
 # ===== Above ====================================================================================================
 
     def nvt_simulation(self, temperature):
@@ -770,8 +773,8 @@ class Liquid(Target):
                 time.sleep(30.0)
 
             if os.path.exists('./%s/npt_result.p' % label):
-                logger.info('I will for 1 min for writing ./%s/npt_result.p\n' % label)
-                time.sleep(60.0)
+                logger.info('Waiting 15 second for writing ./%s/npt_result.p\n' % label)
+                time.sleep(15.0)
                 logger.info('Reading information from ./%s/npt_result.p\n' % label)
                 Points.append(PT)
                 Results[tt] = lp_load('./%s/npt_result.p' % label)
