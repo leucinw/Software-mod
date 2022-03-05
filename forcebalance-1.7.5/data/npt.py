@@ -160,6 +160,7 @@ def energy_derivatives(engine, FF, mvals, h, pgrad, length, AGrad=True, dipole=F
             G[i,:]   = EDG[:]
     return G, GDx, GDy, GDz
 
+
 def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
   # find the prm file name
   for line in open("liquid.key").readlines():
@@ -177,10 +178,14 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
   tinkerpath = "$TINKERPATH" 
   #Record key file except for the first line
   lines = open("liquid-md.key").readlines()[1:]
-  ofile = open("runAna_m.sh","w")
-  ofil1 = open("runAna_p.sh","w")
   #backup the current water.prm
   os.rename(prmprefix +".prm", prmprefix + ".prm.org")
+
+  # this will be used later
+  submitcmds = []
+  tinkercmds = []
+  currdir = os.getcwd()
+
   for i in pgrad:
     #minus and plus
     prmfile1 = open("liquid_%02d_m.key"%i, 'w')
@@ -189,8 +194,6 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
     prmfile2.write("parameters ./%s_%02d_p.prm\n"%(prmprefix,i))
     #use 1 core for each analyze job
     for line in lines:
-      if "OPENMP-THREADS" in line.upper():
-        line = "OPENMP-THREADS 1\n"
       prmfile1.write(line)
       prmfile2.write(line)
     prmfile1.close()
@@ -205,22 +208,28 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
     os.rename(prmprefix + ".prm", prmprefix + "_%02d_p.prm"%i)
     mvals_[i] += -abs(h) 
     
-    if i == pgrad[-1]:
-      cmdstr1 = tinkerpath+"/analyze ./liquid-md.arc -k ./liquid_%02d_m.key G,E,M > liquid_%02d_m.out \n"%(i,i)
-      cmdstr2 = tinkerpath+"/analyze ./liquid-md.arc -k ./liquid_%02d_p.key G,E,M > liquid_%02d_p.out \n"%(i,i)
-    else:
-      cmdstr1 = tinkerpath+"/analyze ./liquid-md.arc -k ./liquid_%02d_m.key G,E,M > liquid_%02d_m.out &\n"%(i,i)
-      cmdstr2 = tinkerpath+"/analyze ./liquid-md.arc -k ./liquid_%02d_p.key G,E,M > liquid_%02d_p.out &\n"%(i,i)
-    ofile.write(cmdstr1)
-    ofil1.write(cmdstr2)
-  ofile.close()
-  ofil1.close()
-  #wait 5sec, for safe
-  time.sleep(5.0)
+    cmdstr1 = f"nohup $analyze_cpu ./liquid-md.arc -k ./liquid_%02d_m.key G,E,M > liquid_%02d_m.out 2>&1"%(i,i)
+    cmdstr2 = f"nohup $analyze_cpu ./liquid-md.arc -k ./liquid_%02d_p.key G,E,M > liquid_%02d_p.out 2>&1"%(i,i)
+    tinkercmds.append(cmdstr1)
+    tinkercmds.append(cmdstr2)
+
+  # rename back the un-perturbed prm file
   os.rename(prmprefix + ".prm.org", prmprefix + ".prm")
+ 
+  # write .sh files
+  # reason is that we want to use env var from sh through ssh
+  for i in range(len(tinkercmds)):
+    with open(f'liquid_{i:02d}.sh', 'w') as f:
+      f.write('source ~/.forcebalanceOrganic\n')
+      f.write(f'{tinkercmds[i]}\n')
+    submitcmds.append(f'cd {currdir}; sh liquid_{i:02d}.sh')
   
-  os.system("sh runAna_m.sh")
-  os.system("sh runAna_p.sh")
+  # use external API to submit 
+
+  submitcmds = [ '"' + cmd + '" ' for cmd in submitcmds]
+  submitstr = ' '.join(submitcmds)
+  os.system(f"python $TINKERPATH/submitTinker.py -c {submitstr} -t CPU -n 6")
+
   #Check whether all analyze jobs finished!
   readFlag = 0
   while readFlag==0:
@@ -234,7 +243,6 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
       readFlag = 1
       break
     else:
-      logger.warning("Some analyze jobs are still running! I will sleep for 30 seconds !\r")
       time.sleep(30.0)
   #If all jobs finished, calculate numerical gradients
   if readFlag == 1:
@@ -296,8 +304,12 @@ def energy_derivatives_gas(FF, h, pgrad, length, AGrad=True):
   tinkerpath = "$TINKERPATH" 
   #Record key file except for the first line
   lines = open("gas-md.key").readlines()[1:]
-  ofile = open("runAna_gas_m.sh","w")
-  ofil1 = open("runAna_gas_p.sh","w")
+  
+  # this will be used later
+  submitcmds = []
+  tinkercmds = []
+  currdir = os.getcwd()
+  
   for i in pgrad:
     #minus and plus
     prmfile1 = open("gas_%02d_m.key"%i, 'w')
@@ -310,21 +322,24 @@ def energy_derivatives_gas(FF, h, pgrad, length, AGrad=True):
     prmfile1.close()
     prmfile2.close()
     
-    if i == pgrad[-1]:
-      cmdstr1 = tinkerpath+"/analyze ./gas-md.arc -k ./gas_%02d_m.key E > gas_%02d_m.out \n"%(i,i)
-      cmdstr2 = tinkerpath+"/analyze ./gas-md.arc -k ./gas_%02d_p.key E > gas_%02d_p.out \n"%(i,i)
-    else:
-      cmdstr1 = tinkerpath+"/analyze ./gas-md.arc -k ./gas_%02d_m.key E > gas_%02d_m.out &\n"%(i,i)
-      cmdstr2 = tinkerpath+"/analyze ./gas-md.arc -k ./gas_%02d_p.key E > gas_%02d_p.out &\n"%(i,i)
-    ofile.write(cmdstr1)
-    ofil1.write(cmdstr2)
-  ofile.close()
-  ofil1.close()
-  #wait 1sec, for safe
-  time.sleep(1.0)
+    cmdstr1 = f"nohup $analyze_cpu ./gas-md.arc -k ./gas_%02d_m.key G,E,M > gas_%02d_m.out 2>&1"%(i,i)
+    cmdstr2 = f"nohup $analyze_cpu ./gas-md.arc -k ./gas_%02d_p.key G,E,M > gas_%02d_p.out 2>&1"%(i,i)
+    tinkercmds.append(cmdstr1)
+    tinkercmds.append(cmdstr2)
   
-  os.system("sh runAna_gas_m.sh")
-  os.system("sh runAna_gas_p.sh")
+  # write .sh files
+  # reason is that we want to use env var from sh through ssh
+  for i in range(len(tinkercmds)):
+    with open(f'gas_{i:02d}.sh', 'w') as f:
+      f.write('source ~/.forcebalanceOrganic\n')
+      f.write(f'{tinkercmds[i]}\n')
+    submitcmds.append(f'cd {currdir}; sh gas_{i:02d}.sh')
+  
+  # use external API to submit 
+  submitcmds = [ '"' + cmd + '" ' for cmd in submitcmds]
+  submitstr = ' '.join(submitcmds)
+  os.system(f"python $TINKERPATH/submitTinker.py -c {submitstr} -t CPU -n 2")
+
   #Check whether all analyze jobs finished!
   readFlag = 0
   while readFlag==0:
@@ -338,7 +353,6 @@ def energy_derivatives_gas(FF, h, pgrad, length, AGrad=True):
       readFlag = 1
       break
     else:
-      logger.warning("Some analyze jobs are still running! I will sleep for 30 seconds !\r")
       time.sleep(30.0)
   #If all jobs finished, calculate numerical gradients
   if readFlag==1:
@@ -486,7 +500,7 @@ def main():
     gas_fnm = TgtOptions['gas_coords']
 
     # Number of threads, multiple timestep integrator, anisotropic box etc.
-    threads = TgtOptions.get('md_threads', 1)
+    threads = TgtOptions.get('md_threads', 4)
     mts = TgtOptions.get('mts_integrator', 0)
     rpmd_beads = TgtOptions.get('rpmd_beads', 0)
     force_cuda = TgtOptions.get('force_cuda', 0)
@@ -603,7 +617,7 @@ def main():
                                     ("mts", mts), ("rpmd_beads", rpmd_beads), ("faststep", faststep)])
     MDOpts["gas"] = OrderedDict([("nsteps", gas_nsteps), ("timestep", gas_timestep),
                                  ("temperature", temperature), ("nsave", int(1000 * gas_intvl / gas_timestep)),
-                                 ("nequil", gas_nequil), ("minimize", minimize), ("threads", 1), ("mts", mts),
+                                 ("nequil", gas_nequil), ("minimize", minimize), ("threads", 4), ("mts", mts),
                                  ("rpmd_beads", rpmd_beads), ("faststep", faststep)])
 
     # Energy components analysis disabled for OpenMM MTS because it uses force groups

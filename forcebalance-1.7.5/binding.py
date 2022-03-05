@@ -213,7 +213,7 @@ class BindingEnergy(Target):
                 opts = systems[sys_]
                 optimize = (opts['optimize'] if 'optimize' in opts else False)
                 if not optimize: 
-                  if (i+1)%24 == 0:
+                  if (i+1)% 16 == 0:
                     cmd = "rm -f %s.out\n%s/analyze %s.xyz -k %s.key E > %s.out \n"%(sys_, os.environ["TINKERPATH"], sys_, sys_, sys_)
                     i += 1
                   else:
@@ -221,7 +221,7 @@ class BindingEnergy(Target):
                     i += 1
                   f1.write(cmd)
                 else:
-                  if (i+1)%24 == 0:
+                  if (i+1)% 16 == 0:
                     cmd = "rm -f %s.xyz_2 %s.out \n%s/optimize %s.xyz -k %s.key 0.0001 > %s.out \n"%(sys_, sys_, os.environ["TINKERPATH"], sys_, sys_, sys_)
                     i += 1
                   else:

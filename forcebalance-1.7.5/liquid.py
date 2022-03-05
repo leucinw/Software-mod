@@ -392,25 +392,42 @@ class Liquid(Target):
 #                         output_files = ['npt_result.p', 'npt.out'] + self.extra_output, tgt=self)
    #! Modified by Chengwen Liu for multiple trajectores liquid simulations
    #! works for multiple liquid targets
-   #! Sep.2020 
-   #==============================================================================================================
+   #! Sep.2020
+   #! this works fine. 
+##==============================================================================================================
+#    def npt_simulation(self, temperature, pressure, simnum):
+#        """ Submit Several NPT simulations on our Clusters """
+#        liquid_tars, temperatures, nodes = np.loadtxt(os.path.join(self.root,self.liquid_node), usecols=(0,1,2,), unpack=True, dtype="str",skiprows=0)
+#        if not os.path.exists('npt_result.p'):
+#            link_dir_contents(os.path.join(self.root,self.rundir),os.getcwd())
+#            self.last_traj += [os.path.join(os.getcwd(), i) for i in self.extra_output]
+#            self.liquid_mol[simnum%len(self.liquid_mol)].write(self.liquid_coords, ftype='tinker' if self.engname == 'tinker' else None)
+#            wkdir = os.path.join(self.root, self.rundir, str(temperature)+"K-"+str(pressure) + "atm")
+#            for tar, temp, node in zip(liquid_tars[:-1],temperatures[:-1], nodes[:-1]):
+#              if (tar in wkdir) and (float(temp) == temperature): 
+#                cmdstr = 'ssh %s "source ~/.forcebalanceOrganic; cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>err.log &" ' % (node, wkdir, self.nptpfx, self.engname, temperature, pressure)
+#                _exec(cmdstr, copy_stderr=True, outfnm='npt.out')
+#            for tar, temp, node in zip(liquid_tars[-1:],temperatures[-1:], nodes[-1:]):
+#              if (tar in wkdir) and (float(temp) == temperature): 
+#                cmdstr = 'cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>err.log & ' % (wkdir, self.nptpfx, self.engname, temperature, pressure)
+#                _exec(cmdstr, copy_stderr=True, outfnm='npt.out')
+##
+
+# The following version works with the external API to submit jobs
+# better job managing
+# Feb 2022
+##==============================================================================================================
     def npt_simulation(self, temperature, pressure, simnum):
-        """ Submit Several NPT simulations on our Clusters """
-        liquid_tars, temperatures, nodes = np.loadtxt(os.path.join(self.root,self.liquid_node), usecols=(0,1,2,), unpack=True, dtype="str",skiprows=0)
-        if not os.path.exists('npt_result.p'):
-            link_dir_contents(os.path.join(self.root,self.rundir),os.getcwd())
-            self.last_traj += [os.path.join(os.getcwd(), i) for i in self.extra_output]
-            self.liquid_mol[simnum%len(self.liquid_mol)].write(self.liquid_coords, ftype='tinker' if self.engname == 'tinker' else None)
-            wkdir = os.path.join(self.root, self.rundir, str(temperature)+"K-"+str(pressure) + "atm")
-            for tar, temp, node in zip(liquid_tars[:-1],temperatures[:-1], nodes[:-1]):
-              if (tar in wkdir) and (float(temp) == temperature): 
-                cmdstr = 'ssh %s "source ~/.forcebalanceOrganic; cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>err.log &" ' % (node, wkdir, self.nptpfx, self.engname, temperature, pressure)
-                _exec(cmdstr, copy_stderr=True, outfnm='npt.out')
-            for tar, temp, node in zip(liquid_tars[-1:],temperatures[-1:], nodes[-1:]):
-              if (tar in wkdir) and (float(temp) == temperature): 
-                cmdstr = 'cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>err.log & ' % (wkdir, self.nptpfx, self.engname, temperature, pressure)
-                _exec(cmdstr, copy_stderr=True, outfnm='npt.out')
-# ===== Above ====================================================================================================
+        # submitcmds here is a global list
+        # this will be used in the following
+        link_dir_contents(os.path.join(self.root, self.rundir), os.getcwd())
+        self.last_traj += [os.path.join(os.getcwd(), i) for i in self.extra_output]
+        self.liquid_mol[simnum%len(self.liquid_mol)].write(self.liquid_coords, ftype='tinker' if self.engname == 'tinker' else None)
+        if not os.path.isfile('npt_result.p'):
+          cmdstr = 'source ~/.forcebalanceOrganic; cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>&1 ' % (os.getcwd(), self.nptpfx, self.engname, temperature, pressure)
+        else:
+          cmdstr = f'echo'
+        submitcmds.append(cmdstr)
 
     def nvt_simulation(self, temperature):
         """ Submit a NVT simulation to the Work Queue. """
@@ -585,7 +602,10 @@ class Liquid(Target):
                     os.remove(fn)
         self.last_traj = []
 
+        # submit jobs using the external API
         def submit_one_setm():
+            global submitcmds
+            submitcmds = []
             snum = 0
             for label, pt in zip(self.Labels, self.PhasePoints):
                 T = pt[0]
@@ -601,6 +621,15 @@ class Liquid(Target):
                     self.nvt_simulation(T)
                 os.chdir('..')
                 snum += 1
+            
+            quote_cmds = [ '"' + s + '" ' for s in submitcmds]
+            submit_str = ' '.join(quote_cmds)
+            # wait for the directory to be created
+            time.sleep(30.0)
+            os.system(f"python $TINKERPATH/submitTinker.py -c {submit_str} -t GPU")
+            # wait for the actual jobs to be appear on node
+            # e.g. can be detected by nvidia-smi
+            time.sleep(30.0)
 
         # Set up and run the simulations.
         submit_one_setm()
