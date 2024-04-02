@@ -182,10 +182,7 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
   os.rename(prmprefix +".prm", prmprefix + ".prm.org")
 
   # this will be used later
-  submitcmds = []
   tinkercmds = []
-  currdir = os.getcwd()
-
   for i in pgrad:
     #minus and plus
     prmfile1 = open("liquid_%02d_m.key"%i, 'w')
@@ -208,8 +205,8 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
     os.rename(prmprefix + ".prm", prmprefix + "_%02d_p.prm"%i)
     mvals_[i] += -abs(h) 
     
-    cmdstr1 = f"nohup $analyze_cpu ./liquid-md.arc -k ./liquid_%02d_m.key G,E,M > liquid_%02d_m.out 2>&1"%(i,i)
-    cmdstr2 = f"nohup $analyze_cpu ./liquid-md.arc -k ./liquid_%02d_p.key G,E,M > liquid_%02d_p.out 2>&1"%(i,i)
+    cmdstr1 = f"analyze ./liquid-md.arc -k ./liquid_%02d_m.key G,E,M > liquid_%02d_m.out 2>&1"%(i,i)
+    cmdstr2 = f"analyze ./liquid-md.arc -k ./liquid_%02d_p.key G,E,M > liquid_%02d_p.out 2>&1"%(i,i)
     tinkercmds.append(cmdstr1)
     tinkercmds.append(cmdstr2)
 
@@ -218,32 +215,49 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
  
   # write .sh files
   # reason is that we want to use env var from sh through ssh
+  shfiles = []
   for i in range(len(tinkercmds)):
     with open(f'liquid_{i:02d}.sh', 'w') as f:
       f.write('source ~/.forcebalanceOrganic\n')
       f.write(f'{tinkercmds[i]}\n')
-    submitcmds.append(f'cd {currdir}; sh liquid_{i:02d}.sh')
+      shfiles.append(f"liquid_{i:02d}.sh")
   
-  # use external API to submit 
-
-  submitcmds = [ '"' + cmd + '" ' for cmd in submitcmds]
-  submitstr = ' '.join(submitcmds)
-  os.system(f"python $TINKERPATH/submitTinker.py -c {submitstr} -t CPU -n 6")
-
-  #Check whether all analyze jobs finished!
+  # store some variables for later use 
+  workingdir = os.getcwd()
+  hoststr = os.getenv('HOSTNAME').split('.')[0]
+  jobpooldir = os.getenv('JOBPOOL')
+  timestr = str(time.time()).replace('.', '')
+  scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
+  jobstr = '  '.join(shfiles)
+  shstr = f"submitTinker.py -x {jobstr} -t CPU -n 4 -p {workingdir}"
+ 
+  # Check whether all analyze jobs finished!
   readFlag = 0
-  while readFlag==0:
+  cmdstr1 = "grep 'Dipole X,Y,Z-Components :' liquid_*_m.out >dipole_m.dat"
+  cmdstr2 = "grep 'Dipole X,Y,Z-Components :' liquid_*_p.out >dipole_p.dat"
+  os.system(cmdstr1)
+  os.system(cmdstr2)
+  nLinesDm = sum(1 for line in open("dipole_m.dat"))
+  nLinesDp = sum(1 for line in open("dipole_p.dat"))
+  if ((nLinesDm == length*len(pgrad)) and (nLinesDp == length*len(pgrad))):
+    readFlag = 1
+  if readFlag == 0:
+    with open(scriptfile, 'w') as f:
+      f.write(shstr)
+  
+  # Keep checking if not all analyze jobs finished!
+  while readFlag == 0:
     cmdstr1 = "grep 'Dipole X,Y,Z-Components :' liquid_*_m.out >dipole_m.dat"
     cmdstr2 = "grep 'Dipole X,Y,Z-Components :' liquid_*_p.out >dipole_p.dat"
     os.system(cmdstr1)
     os.system(cmdstr2)
     nLinesDm = sum(1 for line in open("dipole_m.dat"))
     nLinesDp = sum(1 for line in open("dipole_p.dat"))
-    if ((nLinesDm==length*len(pgrad)) and (nLinesDp==length*len(pgrad))):
+    if ((nLinesDm == length*len(pgrad)) and (nLinesDp == length*len(pgrad))):
       readFlag = 1
       break
     else:
-      time.sleep(30.0)
+      time.sleep(15.0)
   #If all jobs finished, calculate numerical gradients
   if readFlag == 1:
     for i in pgrad:
@@ -322,8 +336,8 @@ def energy_derivatives_gas(FF, h, pgrad, length, AGrad=True):
     prmfile1.close()
     prmfile2.close()
     
-    cmdstr1 = f"nohup $analyze_cpu ./gas-md.arc -k ./gas_%02d_m.key G,E,M > gas_%02d_m.out 2>&1"%(i,i)
-    cmdstr2 = f"nohup $analyze_cpu ./gas-md.arc -k ./gas_%02d_p.key G,E,M > gas_%02d_p.out 2>&1"%(i,i)
+    cmdstr1 = f"nohup analyze ./gas-md.arc -k ./gas_%02d_m.key G,E,M > gas_%02d_m.out 2>&1"%(i,i)
+    cmdstr2 = f"nohup analyze ./gas-md.arc -k ./gas_%02d_p.key G,E,M > gas_%02d_p.out 2>&1"%(i,i)
     tinkercmds.append(cmdstr1)
     tinkercmds.append(cmdstr2)
   
@@ -333,23 +347,23 @@ def energy_derivatives_gas(FF, h, pgrad, length, AGrad=True):
     with open(f'gas_{i:02d}.sh', 'w') as f:
       f.write('source ~/.forcebalanceOrganic\n')
       f.write(f'{tinkercmds[i]}\n')
-    submitcmds.append(f'cd {currdir}; sh gas_{i:02d}.sh')
+    submitcmds.append(f'sh gas_{i:02d}.sh')
   
   # use external API to submit 
   submitcmds = [ '"' + cmd + '" ' for cmd in submitcmds]
   submitstr = ' '.join(submitcmds)
-  os.system(f"python $TINKERPATH/submitTinker.py -c {submitstr} -t CPU -n 2")
+  os.system(f"submitTinker.py -c {submitstr} -t CPU -n 2 -p {currdir}")
 
   #Check whether all analyze jobs finished!
   readFlag = 0
-  while readFlag==0:
+  while readFlag == 0:
     cmdstr1 = "grep 'Total Potential Energy : ' gas_*_m.out >energy_m.dat"
     cmdstr2 = "grep 'Total Potential Energy : ' gas_*_p.out >energy_p.dat"
     os.system(cmdstr1)
     os.system(cmdstr2)
     nLinesDm = sum(1 for line in open("energy_m.dat"))
     nLinesDp = sum(1 for line in open("energy_p.dat"))
-    if ((nLinesDm==length*len(pgrad)) and (nLinesDp==length*len(pgrad))):
+    if ((nLinesDm == length*len(pgrad)) and (nLinesDp == length*len(pgrad))):
       readFlag = 1
       break
     else:

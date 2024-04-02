@@ -29,6 +29,7 @@ from forcebalance.moments import Moments
 from forcebalance.liquid import Liquid
 from forcebalance.molecule import Molecule, BuildLatticeFromLengthsAngles
 from forcebalance.binding import BindingEnergy
+from forcebalance.minimum_match import MinimumMatch
 from forcebalance.interaction import Interaction
 from forcebalance.solvation import Solvation
 from forcebalance.finite_difference import in_fd
@@ -79,18 +80,19 @@ pdict = {'VDW'          : {'Atom':[1], 2:'S',3:'T',4:'D'}, # Van der Waals dista
          'POLARIZE'     : {'Atom':[1], 2:'A',3:'T'},       # Atomic dipole polarizability
          'BOND-CUBIC'   : {'Atom':[], 0:''},    # Below are global parameters.
          'BOND-QUARTIC' : {'Atom':[], 0:''},
-         'DELTA-HALGREN': {'Atom':[], 0:''},    #Delta in VDW function
-         'GAMMA-HALGREN': {'Atom':[], 0:''},    #Gamma in VDW function
-         'CSCALING'     : {'Atom':[], 0:''},    #Monopole scaling factor
-         'DSCALING'     : {'Atom':[], 0:''},    #Dipole scaling factor 
-         'QSCALINGO'    : {'Atom':[], 0:''},    #Quadrupole scaling factor 
-         'QSCALINGH'    : {'Atom':[], 0:''},    #Quadrupole scaling factor 
+         'DELTA-HALGREN': {'Atom':[], 0:''},    # Delta in VDW function
+         'GAMMA-HALGREN': {'Atom':[], 0:''},    # Gamma in VDW function
+         'CSCALING'     : {'Atom':[], 0:''},    # Monopole scaling factor
+         'DSCALING'     : {'Atom':[], 0:''},    # Dipole scaling factor 
+         'QSCALING'     : {'Atom':[], 0:''},    # Quadrupole scaling factor 
          'ANGLE-CUBIC'  : {'Atom':[], 0:''},
          'ANGLE-QUARTIC': {'Atom':[], 0:''},
          'ANGLE-PENTIC' : {'Atom':[], 0:''},
          'ANGLE-SEXTIC' : {'Atom':[], 0:''},
          'DIELECTRIC'   : {'Atom':[], 0:''},
-         'POLAR-SOR'    : {'Atom':[], 0:''}
+         'POLAR-SOR'    : {'Atom':[], 0:''},
+         'VDWPR'        : {'Atom':[1,2], 3:'R',4:'E'},     # Van der Waals pair parameters 
+         'POLPAIR'      : {'Atom':[1,2], 3:'D'},           # Pair damping factor
                                                 # Ignored for now: stretch/bend coupling, out-of-plane bending,
                                                 # torsional parameters, pi-torsion, torsion-torsion
          }
@@ -431,10 +433,6 @@ class TINKER(Engine):
                     tk_defs['polar-eps'] = '1e-6'
             elif self.FF.amoeba_pol == 'direct':
                 tk_opts['polarization'] = 'direct'
-            elif self.FF.amoeba_pol == 'opt3':
-                tk_opts['polarization'] = 'opt3'
-            elif self.FF.amoeba_pol == 'opt4':
-                tk_opts['polarization'] = 'opt4'
             else:
                 warn_press_key("Using TINKER without explicitly specifying AMOEBA settings. Are you sure?")
             self.prm = self.FF.tinkerprm
@@ -958,67 +956,109 @@ class TINKER(Engine):
             os.system("mv %s.xyz_2 %s.xyz" % (self.name, self.name))
             if verbose: logger.info("Done\n")
 
+        # store some variables for later use 
+        workingdir = os.getcwd()
+        hoststr = os.getenv('HOSTNAME').split('.')[0]
+        timestr = str(time.time()).replace('.', '')
+        jobpooldir = os.getenv('JOBPOOL')
+        scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
+
         # Run equilibration.
         if nequil > 0:
             write_key("%s-eq.key" % self.name, eq_opts, "%s.key" % self.name, md_defs)
             if verbose: printcool("Running equilibration dynamics", color=0)
-            if self.pbc and pressure is not None:
-                self.calltinker("dynamic_gpu %s -k %s-eq %i %f %f 4 %f %f N" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, 
-                                                                          temperature, pressure), print_to_screen=verbose)
+            with open(f"{self.name}-eq.sh", 'w') as eq:
+                eq.write("source ~/.forcebalanceOrganic\n")
+                if self.pbc and pressure is not None:
+                    eq.write("$DYNAMIC %s -k %s-eq %i %f %f 4 %f %f > %s-eq.log \n" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, temperature, pressure, self.name))
+                else:
+                    eq.write("dynamic %s -k %s-eq %i %f %f 2 %f > %s-eq.log \n" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, temperature, self.name))
+            # Check if liquid-eq finishes.
+            # liquid-eq finishes then liquid-md.key written
+            if self.pbc:
+              if not os.path.isfile(f"{self.name}-eq.log"):
+                shstr = f"submitTinker.py -x {self.name}-eq.sh -t GPU -p {workingdir}"
+              else:
+                shstr = 'echo CPU'
             else:
-                with open(f"{self.name}-eq.sh", 'w') as eq:
-                    eq.write("source ~/.forcebalanceOrganic\n")
-                    eq.write("$dynamic_cpu %s -k %s-eq %i %f %f 2 %f > %s-eq.log \n" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, temperature, self.name))
-                os.system(f"python $TINKERPATH/submitTinker.py -x {self.name}-eq.sh -n 8 -t CPU")
-                
-                #Check whether dynamic job finishes 
-                neqtraj = int(nequil/1000)
-                iFinish = False 
-                while not iFinish:
-                  if not os.path.isfile(f"{self.name}-eq.log"):
-                    time.sleep(15.0)
-                  else:
-                    cmdstr = f"grep 'Current Time' {self.name}-eq.log > tmp-eq.dat"
-                    os.system(cmdstr)
-                    nLines = sum(1 for line in open("tmp-eq.dat"))
-                    if (nLines == neqtraj):
-                      iFinish = True 
-                      break
-                    else:
-                      time.sleep(15.0)
-            os.system("rm -f %s.arc" % (self.name))
-
-        # Run production.
-        if verbose: printcool("Running production dynamics", color=0)
-        write_key("%s-md.key" % self.name, md_opts, "%s.key" % self.name, md_defs)
-        if self.pbc and pressure is not None:
-            odyn = self.calltinker("dynamic_gpu %s -k %s-md %i %f %f 4 %f %f N" % (self.name, self.name, nsteps, timestep, float(nsave*timestep/1000), 
-                                                                             temperature, pressure), print_to_screen=verbose)
-        else:
-            with open(f"{self.name}-md.sh", 'w') as md:
-                md.write("source ~/.forcebalanceOrganic\n")
-                md.write("$dynamic_cpu %s -k %s-md %i %f %f 2 %f > %s-md.log \n" % (self.name, self.name, nsteps, timestep, float(nsave*timestep)/1000, temperature, self.name))
-            os.system(f"python $TINKERPATH/submitTinker.py -x {self.name}-md.sh -n 8 -t CPU")
+              if not os.path.isfile(f"{self.name}-eq.log"):
+                shstr = f"submitTinker.py -x {self.name}-eq.sh -n 4 -t CPU -p {workingdir}"
+              else:
+                shstr = 'echo CPU'
+            
+            # put the command in jobpool
+            # there is a script responsible for submitting these jobs
+            with open(scriptfile, 'w') as f:
+                f.write(shstr)
             
             #Check whether dynamic job finishes 
-            nmdtraj = int(nsteps/1000)
+            neqtraj = int(nequil/1000)
             iFinish = False 
             while not iFinish:
-              if not os.path.isfile(f"{self.name}-md.log"):
+              if not os.path.isfile(f"{self.name}-eq.log"):
                 time.sleep(15.0)
               else:
-                cmdstr = f"grep 'Current Time' {self.name}-md.log > tmp-md.dat"
+                cmdstr = f"grep 'Current Time' {self.name}-eq.log > tmp-eq.dat"
                 os.system(cmdstr)
-                nLines = sum(1 for line in open("tmp-md.dat"))
-                if (nLines == nmdtraj):
+                nLines = sum(1 for line in open("tmp-eq.dat"))
+                if (nLines == neqtraj):
                   iFinish = True 
                   break
                 else:
                   time.sleep(15.0)
-            
-            odyn = open(f"{self.name}-md.log").readlines()
+            os.system("rm -f %s.arc" % (self.name))
+
+        # Run production.
+        time.sleep(30.0)
+        if verbose: printcool("Running production dynamics", color=0)
+        write_key("%s-md.key" % self.name, md_opts, "%s.key" % self.name, md_defs)
+        with open(f"{self.name}-md.sh", 'w') as md:
+            md.write("source ~/.forcebalanceOrganic\n")
+            if self.pbc and pressure is not None:
+                md.write("$DYNAMIC %s -k %s-md %i %f %f 4 %f %f > %s-md.log \n" % (self.name, self.name, nsteps, timestep, float(nsave*timestep)/1000, temperature, pressure, self.name))
+            else:
+                md.write("dynamic %s -k %s-md %i %f %f 2 %f > %s-md.log \n" % (self.name, self.name, nsteps, timestep, float(nsave*timestep)/1000, temperature, self.name))
+        
+        if self.pbc:
+          if not os.path.isfile(f"{self.name}-md.log"):
+            shstr = f"submitTinker.py -x {self.name}-md.sh -t GPU -p {workingdir}"
+          else:
+            shstr = 'echo CPU'
+        else:
+          if not os.path.isfile(f"{self.name}-md.log"):
+            shstr = f"submitTinker.py -x {self.name}-md.sh -n 4 -t CPU -p {workingdir}"
+          else:
+            shstr = 'echo CPU'
+           
+        hoststr = os.getenv('HOSTNAME').split('.')[0]
+        timestr = str(time.time()).replace('.', '')
+        jobpooldir = os.getenv('JOBPOOL')
+        scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
+        # put the command in jobpool
+        # there is a script responsible for submitting these jobs
+        with open(scriptfile, 'w') as f:
+            f.write(shstr)
+        
+        #Check whether dynamic job finishes 
+        nmdtraj = int(nsteps/1000)
+        iFinish = False 
+        while not iFinish:
+          if not os.path.isfile(f"{self.name}-md.log"):
+            time.sleep(5.0)
+          else:
+            cmdstr = f"grep 'Current Time' {self.name}-md.log > tmp-md.dat"
+            os.system(cmdstr)
+            nLines = sum(1 for line in open("tmp-md.dat"))
+            if (nLines == nmdtraj):
+              iFinish = True 
+              break
+            else:
+              time.sleep(5.0)
+        
+        odyn = open(f"{self.name}-md.log").readlines()
         # Gather information.
-        os.system("mv %s.arc %s-md.arc" % (self.name, self.name))
+        if os.path.isfile(f'{self.name}.arc'):
+            os.system("mv %s.arc %s-md.arc" % (self.name, self.name))
         self.md_trajectory = "%s-md.arc" % self.name
         edyn = []
         kdyn = []
@@ -1040,16 +1080,28 @@ class TINKER(Engine):
         if verbose: logger.info("Post-processing to get the dipole moments\n")
         if self.name == 'liquid':
           with open('liquid-ana.sh', 'w') as f:
-            f.write("source ~/.forcebalanceOrganic\n")
-            f.write("$analyze_cpu liquid-md.arc -k liquid-md.key G,E,M >liquid-md.ana\n")
+            if not os.path.isfile('liquid-md.ana'):
+              f.write("source ~/.forcebalanceOrganic\n")
+              f.write("analyze liquid-md.arc -k liquid-md.key G,E,M >liquid-md.ana\n")
+            else:
+              f.write("echo CPU\n")
           #submit
-          os.system(f"python $TINKERPATH/submitTinker.py -x liquid-ana.sh -n 10 -t CPU")
+          workingdir = os.getcwd()
+          shstr = f"submitTinker.py -x liquid-ana.sh -t CPU -n 4 -p {workingdir}"
+          hoststr = os.getenv('HOSTNAME').split('.')[0]
+          timestr = str(time.time()).replace('.', '')
+          jobpooldir = os.getenv('JOBPOOL')
+          scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
+          # put the command in jobpool
+          # there is a script responsible for submitting these jobs
+          with open(scriptfile, 'w') as f:
+              f.write(shstr)
           #check finish
           nmdtraj = int(nsteps/1000)
           iFinish = False 
           while not iFinish:
             if not os.path.isfile("liquid-md.ana"):
-              time.sleep(15.0)
+              time.sleep(5.0)
             else:
               cmdstr = "grep 'Total Potential Energy' liquid-md.ana > tmp-ana.dat"
               os.system(cmdstr)
@@ -1058,7 +1110,7 @@ class TINKER(Engine):
                 iFinish = True 
                 break
               else:
-                time.sleep(15.0)
+                time.sleep(5.0)
           oanl = open("liquid-md.ana").readlines()
         if self.name == 'gas':
           oanl = self.calltinker("analyze %s-md.arc" % self.name, stdin="G,E,M", print_to_screen=False)
@@ -1070,6 +1122,7 @@ class TINKER(Engine):
         ecomp = OrderedDict()
         havekeys = set()
         first_shot = True
+        
         for ln, line in enumerate(oanl):
             strip = line.strip()
             s = line.split()
@@ -1206,6 +1259,15 @@ class Interaction_TINKER(Interaction):
         ## Initialize base class.
         super(Interaction_TINKER,self).__init__(options,tgt_opts,forcefield)
 
+class MinimumMatch_TINKER(MinimumMatch):
+    """ Subclass of Target for minimus interaction matching using TINKER. """
+    def __init__(self,options,tgt_opts,forcefield):
+        ## Default file names for coordinates and key file.
+        self.set_option(tgt_opts,'tinker_key',default="interactions.key")
+        self.engine_ = TINKER
+        ## Initialize base class.
+        super(MinimumMatch_TINKER,self).__init__(options,tgt_opts,forcefield)
+
 class Moments_TINKER(Moments):
     """ Subclass of Target for multipole moment matching using TINKER. """
     def __init__(self,options,tgt_opts,forcefield):
@@ -1227,23 +1289,17 @@ class Vibration_TINKER(Vibration):
         super(Vibration_TINKER,self).__init__(options,tgt_opts,forcefield)
 
 class Solvation_TINKER(Solvation):
-    """ Solvation free energy using Bennett acceptance ratio (BAR) of TINKER. """
+    """ Solvation free energy using Bennett Acceptance Ratio (BAR) of TINKER. """
 
     def __init__(self,options,tgt_opts,forcefield):
         ## Default file names for coordinates and key file.
         self.engine_ = TINKER
-        ## Coordinate file of solvation box
+        ## Coordinate file of gas phase molecule in box
         self.set_option(tgt_opts,'liquid_xyz',default='liquid.xyz',forceprint=True)
-        ## Key file of solvation box
-        self.set_option(tgt_opts,'liquid_key',default='liquid.key',forceprint=True)
-        ## dynamic.sh 
-        self.set_option(tgt_opts,'dynamic_sh',default='dynamic.sh',forceprint=True)
-        ## bar.sh 
-        self.set_option(tgt_opts,'bar_sh',default='bar.sh',forceprint=True)
-        ## bar.ini
-        self.set_option(tgt_opts,'bar_ini',default='bar.ini',forceprint=True)
-        ## orderparams 
-        self.set_option(tgt_opts,'orderparams',default='orderparams',forceprint=True)
+        ## Coordinate file of gas phase molecule 
+        self.set_option(tgt_opts,'gas_xyz',default='gas.xyz',forceprint=True)
+        ## settings.yaml
+        self.set_option(tgt_opts,'settings_yaml',default='settings.yaml',forceprint=True)
         ## Initialize base class.
         super(Solvation_TINKER,self).__init__(options,tgt_opts,forcefield)
         # These functions need to be called after self.nptfiles is populated

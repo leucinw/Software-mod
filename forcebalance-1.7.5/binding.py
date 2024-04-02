@@ -18,8 +18,9 @@ from subprocess import PIPE
 from forcebalance.finite_difference import fdwrap, f1d2p, f12d3p, in_fd
 from collections import OrderedDict
 from multiprocessing import Pool
-
+import time
 from forcebalance.output import getLogger
+import pathos.multiprocessing as mp 
 logger = getLogger(__name__)
 
 def parse_interactions(input_file):
@@ -162,6 +163,7 @@ class BindingEnergy(Target):
         engine_args.pop('name', None)
         ## Create engine objects.
         self.engines = OrderedDict()
+        arguments = []
         for sysname,sysopt in self.sys_opts.items():
             M = Molecule(os.path.join(self.root, self.tgtdir, sysopt['geometry']))
             if 'select' in sysopt:
@@ -169,6 +171,13 @@ class BindingEnergy(Target):
                 M = M.atom_select(atomselect)
             if self.FF.rigid_water: M.rigid_water()
             self.engines[sysname] = self.engine_(target=self, mol=M, name=sysname, tinker_key=os.path.join(sysopt['keyfile']), **engine_args)
+            #arguments.append([sysname, sysopt])
+        
+        @staticmethod
+        def generate_one(arg):
+          sysname, sysopt = arg
+          self.engines[sysname] = self.engine_(target=self, mol=M, name=sysname, tinker_key=os.path.join(sysopt['keyfile']), **engine_args)
+        
 
     def system_driver(self, sysname):
         opts = self.sys_opts[sysname]
@@ -192,48 +201,28 @@ class BindingEnergy(Target):
             self.FF.make(mvals_)
             VectorD_ = []
 
-            # original code 
-            #for sys_ in self.sys_opts:
-            #    Energy_, RMSD_ = self.system_driver(sys_)
-            #    # Energies are stored in a dictionary.
-            #    EnergyDict[sys_] = Energy_
-            #    RMSDNrm_ = RMSD_ / self.rmsd_denom
-            #    w_ = self.sys_opts[sys_]['rmsd_weight'] if 'rmsd_weight' in self.sys_opts[sys_] else 1.0
-            #    VectorD_.append(np.sqrt(w_)*RMSDNrm_)
-            #    if not in_fd() and RMSD_ != 0.0:
-            #        self.RMSDDict[sys_] = "% 9.3f % 12.5f" % (RMSD_, w_*RMSDNrm_**2)
-
-            # Added by Chengwen
             def Energy_RMSD(systems):
               tinkerhome = os.environ["TINKERPATH"]
-              f1 = open("runAna.sh", "w") 
-              f2 = open("runMin.sh", "w") 
-              i = 0
+              cmdstrs = []
               for sys_ in systems: 
                 opts = systems[sys_]
                 optimize = (opts['optimize'] if 'optimize' in opts else False)
                 if not optimize: 
-                  if (i+1)% 16 == 0:
-                    cmd = "rm -f %s.out\n%s/analyze %s.xyz -k %s.key E > %s.out \n"%(sys_, os.environ["TINKERPATH"], sys_, sys_, sys_)
-                    i += 1
-                  else:
-                    cmd = "rm -f %s.out\n%s/analyze %s.xyz -k %s.key E > %s.out & \n"%(sys_, os.environ["TINKERPATH"], sys_, sys_, sys_)
-                    i += 1
-                  f1.write(cmd)
+                  cmdstr = "rm -f %s.out; %s/analyze %s.xyz -k %s.key E > %s.out"%(sys_, os.environ["TINKERPATH"], sys_, sys_, sys_)
                 else:
-                  if (i+1)% 16 == 0:
-                    cmd = "rm -f %s.xyz_2 %s.out \n%s/optimize %s.xyz -k %s.key 0.0001 > %s.out \n"%(sys_, sys_, os.environ["TINKERPATH"], sys_, sys_, sys_)
-                    i += 1
+                  cmdstr = "rm -f %s.xyz_2 %s.out; %s/optimize %s.xyz -k %s.key 0.0001 > %s.out"%(sys_, sys_, os.environ["TINKERPATH"], sys_, sys_, sys_)
+                cmdstrs.append(cmdstr)
+              
+              ncpu = os.cpu_count()
+              with open("run.sh", 'w') as f:
+                for i in range(len(cmdstrs)):
+                  if (i+1)%ncpu == 0:
+                    f.write(f"{cmdstrs[i]} \n")
                   else:
-                    cmd = "rm -f %s.xyz_2 %s.out \n%s/optimize %s.xyz -k %s.key 0.0001 > %s.out & \n"%(sys_, sys_, os.environ["TINKERPATH"], sys_, sys_, sys_)
-                    i += 1
-                  f2.write(cmd)
-              f1.write("wait\n")
-              f2.write("wait\n")
-              f1.close()
-              f2.close()
-              os.system("sh runAna.sh")
-              os.system("sh runMin.sh")
+                    f.write(f"{cmdstrs[i]} &\n")
+                f.write(f"wait\n")
+              
+              os.system("sh run.sh")
               for sys_ in systems:
                 while not os.path.isfile(os.path.join(os.getcwd(), sys_ + ".out")):
                   time.sleep(1.0)
