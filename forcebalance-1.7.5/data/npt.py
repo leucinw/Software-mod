@@ -225,7 +225,7 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
   # store some variables for later use 
   workingdir = os.getcwd()
   hoststr = os.getenv('HOSTNAME').split('.')[0]
-  jobpooldir = os.getenv('JOBPOOL')
+  jobpooldir = '$JOBPOOL'
   timestr = str(time.time()).replace('.', '')
   scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
   jobstr = '  '.join(shfiles)

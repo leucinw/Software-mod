@@ -960,7 +960,7 @@ class TINKER(Engine):
         workingdir = os.getcwd()
         hoststr = os.getenv('HOSTNAME').split('.')[0]
         timestr = str(time.time()).replace('.', '')
-        jobpooldir = os.getenv('JOBPOOL')
+        jobpooldir = '$JOBPOOL'
         scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
 
         # Run equilibration.
@@ -1032,7 +1032,7 @@ class TINKER(Engine):
            
         hoststr = os.getenv('HOSTNAME').split('.')[0]
         timestr = str(time.time()).replace('.', '')
-        jobpooldir = os.getenv('JOBPOOL')
+        jobpooldir = '$JOBPOOL'
         scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
         # put the command in jobpool
         # there is a script responsible for submitting these jobs
@@ -1090,7 +1090,7 @@ class TINKER(Engine):
           shstr = f"submitTinker.py -x liquid-ana.sh -t CPU -n 4 -p {workingdir}"
           hoststr = os.getenv('HOSTNAME').split('.')[0]
           timestr = str(time.time()).replace('.', '')
-          jobpooldir = os.getenv('JOBPOOL')
+          jobpooldir = '$JOBPOOL'
           scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
           # put the command in jobpool
           # there is a script responsible for submitting these jobs
