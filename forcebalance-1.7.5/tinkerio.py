@@ -960,7 +960,7 @@ class TINKER(Engine):
         workingdir = os.getcwd()
         hoststr = os.getenv('HOSTNAME').split('.')[0]
         timestr = str(time.time()).replace('.', '')
-        jobpooldir = '$JOBPOOL'
+        jobpooldir = os.environ["JOBPOOL"]
         scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
 
         # Run equilibration.
@@ -977,12 +977,12 @@ class TINKER(Engine):
             # liquid-eq finishes then liquid-md.key written
             if self.pbc:
               if not os.path.isfile(f"{self.name}-eq.log"):
-                shstr = f"submitTinker.py -x {self.name}-eq.sh -t GPU -p {workingdir}"
+                shstr = f"python {self.tinkerpath}/submitTinker.py -x {self.name}-eq.sh -t GPU -p {workingdir}"
               else:
                 shstr = 'echo CPU'
             else:
               if not os.path.isfile(f"{self.name}-eq.log"):
-                shstr = f"submitTinker.py -x {self.name}-eq.sh -n 4 -t CPU -p {workingdir}"
+                shstr = f"python {self.tinkerpath}/submitTinker.py -x {self.name}-eq.sh -n 4 -t CPU -p {workingdir}"
               else:
                 shstr = 'echo CPU'
             
@@ -1021,18 +1021,18 @@ class TINKER(Engine):
         
         if self.pbc:
           if not os.path.isfile(f"{self.name}-md.log"):
-            shstr = f"submitTinker.py -x {self.name}-md.sh -t GPU -p {workingdir}"
+            shstr = f"python {self.tinkerpath}/submitTinker.py -x {self.name}-md.sh -t GPU -p {workingdir}"
           else:
             shstr = 'echo CPU'
         else:
           if not os.path.isfile(f"{self.name}-md.log"):
-            shstr = f"submitTinker.py -x {self.name}-md.sh -n 4 -t CPU -p {workingdir}"
+            shstr = f"python {self.tinkerpath}/submitTinker.py -x {self.name}-md.sh -n 4 -t CPU -p {workingdir}"
           else:
             shstr = 'echo CPU'
            
         hoststr = os.getenv('HOSTNAME').split('.')[0]
         timestr = str(time.time()).replace('.', '')
-        jobpooldir = '$JOBPOOL'
+        jobpooldir = os.environ["JOBPOOL"]
         scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
         # put the command in jobpool
         # there is a script responsible for submitting these jobs
@@ -1087,10 +1087,10 @@ class TINKER(Engine):
               f.write("echo CPU\n")
           #submit
           workingdir = os.getcwd()
-          shstr = f"submitTinker.py -x liquid-ana.sh -t CPU -n 4 -p {workingdir}"
+          shstr = f"python {self.tinkerpath}/submitTinker.py -x liquid-ana.sh -t CPU -n 4 -p {workingdir}"
           hoststr = os.getenv('HOSTNAME').split('.')[0]
           timestr = str(time.time()).replace('.', '')
-          jobpooldir = '$JOBPOOL'
+          jobpooldir = os.environ["JOBPOOL"]
           scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
           # put the command in jobpool
           # there is a script responsible for submitting these jobs

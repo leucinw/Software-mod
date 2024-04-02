@@ -174,8 +174,7 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
   if not AGrad:
     return G, GDx, GDy, GDz
 
-  #Actually tinkerpath is an argument in FB
-  tinkerpath = "$TINKERPATH" 
+  tinkerpath = os.environ["TINKERPATH"]
   #Record key file except for the first line
   lines = open("liquid-md.key").readlines()[1:]
   #backup the current water.prm
@@ -225,11 +224,11 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
   # store some variables for later use 
   workingdir = os.getcwd()
   hoststr = os.getenv('HOSTNAME').split('.')[0]
-  jobpooldir = '$JOBPOOL'
+  jobpooldir = os.environ["JOBPOOL"]
   timestr = str(time.time()).replace('.', '')
   scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
   jobstr = '  '.join(shfiles)
-  shstr = f"submitTinker.py -x {jobstr} -t CPU -n 4 -p {workingdir}"
+  shstr = f"python {tinkerpath}/submitTinker.py -x {jobstr} -t CPU -n 4 -p {workingdir}"
  
   # Check whether all analyze jobs finished!
   readFlag = 0
@@ -314,8 +313,7 @@ def energy_derivatives_gas(FF, h, pgrad, length, AGrad=True):
   G   = np.zeros((FF.np,length))
   if not AGrad:
     return G
-  #Actually tinkerpath is an argument in FB
-  tinkerpath = "$TINKERPATH" 
+  tinkerpath = os.environ["TINKERPATH"]
   #Record key file except for the first line
   lines = open("gas-md.key").readlines()[1:]
   
@@ -352,7 +350,7 @@ def energy_derivatives_gas(FF, h, pgrad, length, AGrad=True):
   # use external API to submit 
   submitcmds = [ '"' + cmd + '" ' for cmd in submitcmds]
   submitstr = ' '.join(submitcmds)
-  os.system(f"submitTinker.py -c {submitstr} -t CPU -n 2 -p {currdir}")
+  os.system(f"python {tinkerpath}/submitTinker.py -c {submitstr} -t CPU -n 2 -p {currdir}")
 
   #Check whether all analyze jobs finished!
   readFlag = 0
