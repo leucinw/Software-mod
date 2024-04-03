@@ -7,3 +7,5 @@ $action $libdir/liquid.py       $curdir/liquid.py
 $action $libdir/parser.py       $curdir/parser.py
 $action $libdir/tinkerio.py     $curdir/tinkerio.py
 $action $libdir/data/npt.py     $curdir/data/npt.py
+$action $libdir/minimum_match.py      $curdir/minimum_match.py
+$action $libdir/solvation.py      $curdir/solvation.py
