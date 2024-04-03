@@ -961,6 +961,7 @@ class TINKER(Engine):
         hoststr = os.getenv('HOSTNAME').split('.')[0]
         timestr = str(time.time()).replace('.', '')
         jobpooldir = os.environ["JOBPOOL"]
+        fbbashrc = os.environ["FBBASHRC"]
         scriptfile = f"{jobpooldir}/{hoststr}-{timestr}.sh"
 
         # Run equilibration.
@@ -968,7 +969,7 @@ class TINKER(Engine):
             write_key("%s-eq.key" % self.name, eq_opts, "%s.key" % self.name, md_defs)
             if verbose: printcool("Running equilibration dynamics", color=0)
             with open(f"{self.name}-eq.sh", 'w') as eq:
-                eq.write("source ~/.forcebalanceOrganic\n")
+                eq.write(f"source {fbbashrc}\n")
                 if self.pbc and pressure is not None:
                     eq.write("$DYNAMIC %s -k %s-eq %i %f %f 4 %f %f > %s-eq.log \n" % (self.name, self.name, nequil, timestep, float(nsave*timestep)/1000, temperature, pressure, self.name))
                 else:
@@ -1013,7 +1014,7 @@ class TINKER(Engine):
         if verbose: printcool("Running production dynamics", color=0)
         write_key("%s-md.key" % self.name, md_opts, "%s.key" % self.name, md_defs)
         with open(f"{self.name}-md.sh", 'w') as md:
-            md.write("source ~/.forcebalanceOrganic\n")
+            md.write(f"source {fbbashrc}\n")
             if self.pbc and pressure is not None:
                 md.write("$DYNAMIC %s -k %s-md %i %f %f 4 %f %f > %s-md.log \n" % (self.name, self.name, nsteps, timestep, float(nsave*timestep)/1000, temperature, pressure, self.name))
             else:
@@ -1081,7 +1082,7 @@ class TINKER(Engine):
         if self.name == 'liquid':
           with open('liquid-ana.sh', 'w') as f:
             if not os.path.isfile('liquid-md.ana'):
-              f.write("source ~/.forcebalanceOrganic\n")
+              f.write(f"source {fbbashrc}\n")
               f.write("analyze liquid-md.arc -k liquid-md.key G,E,M >liquid-md.ana\n")
             else:
               f.write("echo CPU\n")

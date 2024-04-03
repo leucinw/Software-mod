@@ -215,9 +215,10 @@ def energy_derivatives_TINKER(FF, mvals, h, pgrad, length, AGrad=True):
   # write .sh files
   # reason is that we want to use env var from sh through ssh
   shfiles = []
+  fbbashrc = os.environ["FBBASHRC"]
   for i in range(len(tinkercmds)):
     with open(f'liquid_{i:02d}.sh', 'w') as f:
-      f.write('source ~/.forcebalanceOrganic\n')
+      f.write(f'source {fbbashrc}\n')
       f.write(f'{tinkercmds[i]}\n')
       shfiles.append(f"liquid_{i:02d}.sh")
   
@@ -341,9 +342,10 @@ def energy_derivatives_gas(FF, h, pgrad, length, AGrad=True):
   
   # write .sh files
   # reason is that we want to use env var from sh through ssh
+  fbbashrc = os.environ["FBBASHRC"]
   for i in range(len(tinkercmds)):
     with open(f'gas_{i:02d}.sh', 'w') as f:
-      f.write('source ~/.forcebalanceOrganic\n')
+      f.write(f'source {fbbashrc}\n')
       f.write(f'{tinkercmds[i]}\n')
     submitcmds.append(f'sh gas_{i:02d}.sh')
   

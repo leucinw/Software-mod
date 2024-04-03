@@ -398,8 +398,9 @@ class Liquid(Target):
         link_dir_contents(os.path.join(self.root, self.rundir), os.getcwd())
         self.last_traj += [os.path.join(os.getcwd(), i) for i in self.extra_output]
         self.liquid_mol[simnum%len(self.liquid_mol)].write(self.liquid_coords, ftype='tinker' if self.engname == 'tinker' else None)
+        fbbashrc = os.environ["FBBASHRC"]
         if not os.path.isfile('npt_result.p'):
-          cmdstr = 'source ~/.forcebalanceOrganic; cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>&1 &' % (os.getcwd(), self.nptpfx, self.engname, temperature, pressure)
+          cmdstr = f'source {fbbashrc}; cd %s; nohup %s python -u npt.py %s %.3f %.3f > npt.out 2>&1 &' % (os.getcwd(), self.nptpfx, self.engname, temperature, pressure)
           os.system(cmdstr)
           logger.info(f"Running {cmdstr}.\n")
           # this is to let the job appear on a node
