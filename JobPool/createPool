@@ -1,0 +1,12 @@
+#!/bin/bash
+# create a pool
+
+submitters_id=$1
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+sub_dir=.submitters$submitters_id
+
+cd $SCRIPT_DIR && mkdir $sub_dir && echo $sub_dir
+nohup python subJobs.py CPU $submitters_id >>cpu.log 2>&1 &
+nohup python subJobs.py GPU $submitters_id >>gpu.log 2>&1 &
+

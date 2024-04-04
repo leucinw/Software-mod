@@ -159,7 +159,7 @@ def submit_jobs(jobcmds, jobtype):
 def read_node_list():
   g_list = []
   c_list = []
-  node_list = "/home/liuchw/bin/TinkerGPU2022/nodes.dat"
+  node_list = f"{os.path.dirname(os.path.abspath(__file__))}/nodes.dat"
   lines = open(node_list).readlines()
   for line in lines:
     if not line[0].startswith("#"):

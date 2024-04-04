@@ -993,7 +993,7 @@ class TINKER(Engine):
                 f.write(shstr)
             
             #Check whether dynamic job finishes 
-            neqtraj = int(nequil/1000)
+            neqtraj = int(nequil/nsave)
             iFinish = False 
             while not iFinish:
               if not os.path.isfile(f"{self.name}-eq.log"):
@@ -1041,7 +1041,7 @@ class TINKER(Engine):
             f.write(shstr)
         
         #Check whether dynamic job finishes 
-        nmdtraj = int(nsteps/1000)
+        nmdtraj = int(nsteps/nsave)
         iFinish = False 
         while not iFinish:
           if not os.path.isfile(f"{self.name}-md.log"):
@@ -1098,7 +1098,7 @@ class TINKER(Engine):
           with open(scriptfile, 'w') as f:
               f.write(shstr)
           #check finish
-          nmdtraj = int(nsteps/1000)
+          nmdtraj = int(nsteps/nsave)
           iFinish = False 
           while not iFinish:
             if not os.path.isfile("liquid-md.ana"):

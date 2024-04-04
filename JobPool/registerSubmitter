@@ -1,0 +1,27 @@
+#!/bin/bash
+# register a process as a submitter to the job pool,
+# create a new job pool if none is active
+# use existing pool if there is one
+
+name=$1
+info=$2
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cd $SCRIPT_DIR || exit 1
+
+./lock get
+trap "./lock release"  EXIT TERM INT
+
+sub_dir=`find . -path "./.submitters*" -prune`
+if [ -z "$sub_dir" ]; then
+    sub_dir=`./createPool "$(date +%s).$$"`
+fi
+if [ -z "$sub_dir" ]; then
+    exit 1
+fi
+    
+fname=$sub_dir/$name.`date +%s`.$PPID
+echo "Since `date`" > $fname
+echo $info >> $fname
+echo $fname
+

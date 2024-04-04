@@ -1,5 +1,5 @@
 export libdir=/home/liuchw/anaconda3/envs/FB17/lib/python3.7/site-packages/forcebalance
-export curdir=/home/liuchw/Documents/Github.leucinw/Software-mod/forcebalance-1.7.5
+export curdir=/home/liuchw/Documents/Github.leucinw/Software-mod/forcebalance-1.7.5/mod
 action=$1
 
 $action $libdir/binding.py      $curdir/binding.py

@@ -1,0 +1,16 @@
+#!/bin/bash
+# deregister a submitter from the job pool
+# close the pool if no submitter left
+# the pool will still finish submitting all the jobs pending currently before fully terminating.
+
+fname=$1
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cd $SCRIPT_DIR || exit 1
+
+./lock get
+trap "./lock release"  EXIT TERM INT
+rm $fname
+sub_dir=`dirname $fname`
+./closePool $sub_dir 2>/dev/null
+
