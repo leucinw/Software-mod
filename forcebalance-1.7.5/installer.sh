@@ -62,8 +62,7 @@ export tk9home=$tinker9_bin
 export JOBPOOL=$(cd ../JobPool && pwd)
 " > $fb_bashrc
 
-echo -e '
-export PATH=$TINKERPATH:$PATH
+echo -e 'export PATH=$TINKERPATH:$PATH
 export FBBASHRC=`readlink -f "${BASH_SOURCE[0]}"`
 
 VAL=`nvidia-smi &> /dev/null; echo $?`
@@ -81,6 +80,13 @@ fi
 
 echo -e "
 
+ForceBalance 1.7.5 has been installed successfully into the conda environment $conda_env.
+The bashrc file for ForceBalance has been generated at $fb_bashrc.
+The Tinker executables have been linked into $tinker_link_path,
+which is also recorded in $fb_bashrc as \`TINKERPATH\`.
+Please make sure \`TINKERPATH\` and \`tk9home\` in $fb_bashrc are up to date before running jobs.
+Please set the \`tinkerpath\` in your ForceBalance input file (e.g., example.in)
+as the same to \`TINKERPATH\`, so that a consistent Tinker installation is invoked throughout the job.
 Installation completed. To run a ForceBalance job:
 
      $ source $fb_bashrc
