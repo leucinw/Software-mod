@@ -1,0 +1,14 @@
+#!/bin/bash
+# close a job pool
+
+sub=$1
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cd $SCRIPT_DIR || exit 1
+if [ -e "$sub" ]; then
+    sub_dir=$sub
+else
+    sub_dir=.submitters$sub
+fi
+rmdir $sub_dir
+

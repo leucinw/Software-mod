@@ -1,0 +1,17 @@
+#!/bin/bash
+# get the lock to edit the file 'submitters'
+
+task=$1
+name=$2
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+lock=$SCRIPT_DIR/.lock_$name
+if [ $task == "get" ]; then
+    while ! mkdir -- "$lock" 2>/dev/null; do
+        sleep 3
+    done
+    touch $lock/ownedByPID.$PPID
+elif [ $task == "release" ]; then
+    rm -r $lock
+fi
+

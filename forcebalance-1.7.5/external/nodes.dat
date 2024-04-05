@@ -1,0 +1,21 @@
+#===========================================
+#   Any line starts with "#" will be ignored.
+#   Only the first two columns matter !!
+#   Add / remove nodes as needed.
+
+#   This file is used by submitTinker.py,
+#   and must be placed in the same folder.
+#   Do not change the filename. 
+#===========================================
+
+### GPU nodes mainly use
+
+GPU node152   4090    2
+
+GPU node165
+
+#CPU nodes nthreads
+
+CPU      node152  64
+
+CPU      node161  64
