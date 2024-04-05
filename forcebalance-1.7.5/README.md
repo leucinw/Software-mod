@@ -4,13 +4,13 @@ This folder contains files and scripts needed to set up ForceBalance 1.7.5 for t
 
 ## Installation
 
-To install ForceBalance with the patch, open `installer.sh` and modify the variables at the beginning to fit your case, then run
+You will need conda in the server to continue. To install ForceBalance with the patch, open `installer.sh` and modify the variables at the beginning to fit your case, then run
 ```
 $ bash installer.sh
 ```
 Please refrain from deleting any files within this directory or the directory `../JobPool` after the installation, as certain files are utilized each time you execute a ForceBalance job.
 
-When the installation completes, a message like the following will show you how to run a ForceBalance job.
+When the installation completes, a message like the following will show you how to run a ForceBalance job. The filenames may vary.
 ```
 Installation completed. To run a ForceBalance job:
 
