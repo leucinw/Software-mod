@@ -17,7 +17,7 @@ if __name__ == "__main__":
     submitters_file += sys.argv[2]
 
   def _worker():
-    os.system("./lock get j")
+    os.system("./lock get "+sys.argv[1])
     # print("Got Lock j", flush=True)
     try:
       cmd = "grep ' " + sys.argv[1] + " ' *.sh -l 2>/dev/null" 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     except:
       pass
     finally:
-      os.system("./lock release j")
+      os.system("./lock release "+sys.argv[1])
   
   while os.path.exists(submitters_file):
     _worker()

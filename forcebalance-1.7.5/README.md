@@ -56,3 +56,32 @@ CPU      node153  64
 ## JobPool
 
 `../JobPool` is required for the patched ForceBalance. See `../JobPool/README.md` for more information.
+
+## Troubleshooting
+1. If you see messages like below while executing `conda create`, it is because you have once installed ForceBalance of the same version and you have modified the content of the package without being careful enough. Conda uses hardlinks by default to save disk space when installing packages. If you make changes to package contents within any conda environment directory without first unlinking them, those modifications will affect all other conda environments containing the same package of the same version, including any new conda environments created in the future!
+
+    ```
+    Verifying transaction: /
+    SafetyError: The package for forcebalance located at /work/yw24267/miniconda3/pkgs/forcebalance-1.7.5-py37h6dcda5c_3
+    appears to be corrupted. The path 'lib/python3.7/site-packages/forcebalance/binding.py'
+    has an incorrect size.
+    reported size: 12317 bytes
+    actual size: 14726 bytes
+
+    SafetyError: The package for forcebalance located at /work/yw24267/miniconda3/pkgs/forcebalance-1.7.5-py37h6dcda5c_3
+    appears to be corrupted. The path 'lib/python3.7/site-packages/forcebalance/data/npt.py'
+    has an incorrect size.
+    reported size: 32121 bytes
+    actual size: 40338 bytes
+
+    (...)
+    ```
+    That being said, if you only modified the files seen in `./mod/` in this repo, rest assured that the newly created conda enviroment is all good since the modifications has been overwritten by `installer.sh` only within the new environment. All other environments remain unaltered. Otherwise, see the solution below.
+    1. Backup the modifications you have made on ForceBalance previously.
+    1. Remove the new environment created by `install.sh`.
+    1. Remove ForceBalance 1.7.5 from all conda enviroments.
+    2. Remove all cache using `conda clean -a -y`.
+    3. Reinstall ForceBalance 1.7.5 into the enviroments in Step 3.
+    4. This time, back up the original package files if needed, then use 
+        `cp --remove-destination` to copy your modified files to the enviroment directory.
+    5. Run `install.sh` again. The SafetyError you saw should be gone now.

@@ -32,14 +32,14 @@ cp $fbHOME/parser.py $fbHOME/parser.py_back
 cp $fbHOME/data/npt.py $fbHOME/data/npt.py_back
 cp $condaHOME/bin/ForceBalance $condaHOME/bin/ForceBalance_back
 # patch the mod
-cp $modfileHOME/binding.py $fbHOME/binding.py
-cp $modfileHOME/liquid.py  $fbHOME/liquid.py
-cp $modfileHOME/tinkerio.py $fbHOME/tinkerio.py
-cp $modfileHOME/parser.py $fbHOME/parser.py
-cp $modfileHOME/data/npt.py $fbHOME/data/npt.py
-cp $modfileHOME/minimum_match.py $fbHOME/minimum_match.py
-cp $modfileHOME/solvation.py $fbHOME/solvation.py
-cp $modfileHOME/ForceBalance $condaHOME/bin/ForceBalance
+cp --remove-destination $modfileHOME/binding.py $fbHOME/binding.py
+cp --remove-destination $modfileHOME/liquid.py  $fbHOME/liquid.py
+cp --remove-destination $modfileHOME/tinkerio.py $fbHOME/tinkerio.py
+cp --remove-destination $modfileHOME/parser.py $fbHOME/parser.py
+cp --remove-destination $modfileHOME/data/npt.py $fbHOME/data/npt.py
+cp --remove-destination $modfileHOME/minimum_match.py $fbHOME/minimum_match.py
+cp --remove-destination $modfileHOME/solvation.py $fbHOME/solvation.py
+cp --remove-destination $modfileHOME/ForceBalance $condaHOME/bin/ForceBalance
 
 ###
 ### link Tinker executables
@@ -80,7 +80,7 @@ fi
 
 echo -e "
 
-ForceBalance 1.7.5 has been installed successfully into the conda environment $conda_env.
+ForceBalance 1.7.5 has been installed into the conda environment $conda_env.
 The bashrc file for ForceBalance has been generated at $fb_bashrc.
 The Tinker executables have been linked into $tinker_link_path,
 which is also recorded in $fb_bashrc as \`TINKERPATH\`.
