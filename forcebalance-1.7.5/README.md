@@ -78,10 +78,10 @@ CPU      node153  64
     ```
     That being said, if you only modified the files seen in `./mod/` in this repo, rest assured that the newly created conda enviroment is all good since the modifications has been overwritten by `installer.sh` only within the new environment. All other environments remain unaltered. Otherwise, see the solution below.
     1. Backup the modifications you have made on ForceBalance previously.
-    1. Remove the new environment created by `install.sh`.
+    1. Remove the new environment created by `installer.sh`.
     1. Remove ForceBalance 1.7.5 from all conda enviroments.
     2. Remove all cache using `conda clean -a -y`.
     3. Reinstall ForceBalance 1.7.5 into the enviroments in Step 3.
     4. This time, back up the original package files if needed, then use 
         `cp --remove-destination` to copy your modified files to the enviroment directory.
-    5. Run `install.sh` again. The SafetyError you saw should be gone now.
+    5. Run `installer.sh` again. The SafetyError you saw should be gone now.
