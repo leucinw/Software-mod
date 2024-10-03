@@ -25,7 +25,7 @@ if __name__ == "__main__":
       for sp in sp_ret:
         subcmd = f"sh {sp}; rm {sp}"
         os.system(subcmd)
-        print(subcmd, flush=True)
+        print(f"[{time.asctime()}] {subcmd}", flush=True)
     except:
       pass
     finally:
