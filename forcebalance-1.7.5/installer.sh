@@ -37,6 +37,7 @@ cp --remove-destination $modfileHOME/binding.py $fbHOME/binding.py
 cp --remove-destination $modfileHOME/liquid.py  $fbHOME/liquid.py
 cp --remove-destination $modfileHOME/tinkerio.py $fbHOME/tinkerio.py
 cp --remove-destination $modfileHOME/parser.py $fbHOME/parser.py
+cp --remove-destination $modfileHOME/objective.py $fbHOME/objective.py
 cp --remove-destination $modfileHOME/data/npt.py $fbHOME/data/npt.py
 cp --remove-destination $modfileHOME/minimum_match.py $fbHOME/minimum_match.py
 cp --remove-destination $modfileHOME/solvation.py $fbHOME/solvation.py
