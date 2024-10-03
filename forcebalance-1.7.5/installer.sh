@@ -9,8 +9,8 @@
 # Please modify the variables below to fit your case before running the script.
 
 # path to Tinker binaries
-tinker_bin=/home/liuchw/Softwares/tinkers/Tinker8/2402/source
-tinker9_bin=/home/liuchw/Softwares/tinkers/Tinker9/2403/build
+tinker_bin=/home/yw24267/programs/tinker/Tinker8/latest/bin
+tinker9_bin=/home/yw24267/programs/tinker/Tinker9/latest/build
 # the name of the conda environment for forcebalance
 conda_env=FB17
 # where to put the generated bashrc file
@@ -29,6 +29,7 @@ cp $fbHOME/binding.py $fbHOME/binding.py_back
 cp $fbHOME/liquid.py $fbHOME/liquid.py_back
 cp $fbHOME/tinkerio.py $fbHOME/tinkerio.py_back
 cp $fbHOME/parser.py $fbHOME/parser.py_back
+cp $fbHOME/objective.py $fbHOME/objective.py_back
 cp $fbHOME/data/npt.py $fbHOME/data/npt.py_back
 cp $condaHOME/bin/ForceBalance $condaHOME/bin/ForceBalance_back
 # patch the mod
@@ -63,6 +64,8 @@ export JOBPOOL=$(cd ../JobPool && pwd)
 " > $fb_bashrc
 
 echo -e 'export PATH=$TINKERPATH:$PATH
+# minimum_match invokes some of CWs scripts.
+export PATH=$PATH:/home/liuchw/bin/
 export FBBASHRC=`readlink -f "${BASH_SOURCE[0]}"`
 
 VAL=`nvidia-smi &> /dev/null; echo $?`
