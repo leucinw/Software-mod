@@ -1,0 +1,8 @@
+/JobPool/*log
+/JobPool/*.sh
+/JobPool/.submitters*
+/JobPool/.lock*
+
+/forcebalance-1.7.5/external/*
+!/forcebalance-1.7.5/external/link.sh
+!/forcebalance-1.7.5/external/submitTinker.py

@@ -104,7 +104,7 @@ def check_gpu_avail(node):
   # dynamic is for openmm
   # gmx is for gromacs
   for r in sp_ret1:        
-    if ('tinker9' in r) or ('dynamic' in r) or ('dynamic9' in r) or ('gmx' in r) or ('bar9' in r) or ('python' in r):
+    if ('tinker9' in r) or ('dynamic' in r) or ('dynamic9' in r) or ('gmx' in r) or ('bar9' in r) or ('python' in r) or ("terachem" in r):
       occ_cards.append(r.split()[1])
   
   ava_cards = tot_cards
@@ -124,7 +124,7 @@ def submit_jobs(jobcmds, jobtype):
         cmdstr = f"ssh -o stricthostkeychecking=no {cpu_node_list[i]} '" + jobcmds[njob_pointer] +  "' &"
         subprocess.run(cmdstr, shell=True)
         jobcmds[njob_pointer] = 'x'
-        print(f"   --> {cmdstr}")
+        print(f"[{time.asctime()}]   --> {cmdstr}")
         njob_pointer += 1
     # wait for 15 sec. to let job appear on a node
     # i.e., shown by top command to avoid CPU overloading 
@@ -141,7 +141,7 @@ def submit_jobs(jobcmds, jobtype):
             cmdstr = f"ssh -o stricthostkeychecking=no {gpu_node_list[i]} '{pci_bus_id}; {cuda_device}; {jobcmds[njob_pointer]} ' &"
             subprocess.run(cmdstr, shell=True)
             jobcmds[njob_pointer] = 'x'
-            print(f"   --> {cmdstr}")
+            print(f"[{time.asctime()}]   --> {cmdstr}")
             njob_pointer += 1
     # wait for 30 sec. to let job appear on a node
     # i.e., shown by nvidia-smi command
@@ -229,7 +229,7 @@ if __name__ == '__main__':
       jobsh = jobshs[i]
       jobcmds.append(f'cd {workingdir}; sh {jobsh}')
   
-  print(GREEN + f"   === Submitting {jtyp} Jobs to Ren Lab Clusters === " + ENDC)
+  print(f"[{time.asctime()}]", GREEN + f"   === Submitting {jtyp} Jobs to Ren Lab Clusters === " + ENDC)
   if nodes != []:
     gpu_node_list = nodes
     cpu_node_list = nodes
