@@ -30,7 +30,9 @@ cp $fbHOME/liquid.py $fbHOME/liquid.py_back
 cp $fbHOME/tinkerio.py $fbHOME/tinkerio.py_back
 cp $fbHOME/parser.py $fbHOME/parser.py_back
 cp $fbHOME/objective.py $fbHOME/objective.py_back
+cp $fbHOME/molecule.py $fbHOME/molecule.py_back
 cp $fbHOME/data/npt.py $fbHOME/data/npt.py_back
+cp $fbHOME/data/md_ism_hfe.py $fbHOME/data/md_ism_hfe.py_back
 cp $condaHOME/bin/ForceBalance $condaHOME/bin/ForceBalance_back
 # patch the mod
 cp --remove-destination $modfileHOME/binding.py $fbHOME/binding.py
@@ -38,7 +40,9 @@ cp --remove-destination $modfileHOME/liquid.py  $fbHOME/liquid.py
 cp --remove-destination $modfileHOME/tinkerio.py $fbHOME/tinkerio.py
 cp --remove-destination $modfileHOME/parser.py $fbHOME/parser.py
 cp --remove-destination $modfileHOME/objective.py $fbHOME/objective.py
+cp --remove-destination $modfileHOME/molecule.py $fbHOME/molecule.py
 cp --remove-destination $modfileHOME/data/npt.py $fbHOME/data/npt.py
+cp --remove-destination $modfileHOME/data/md_ism_hfe.py $fbHOME/data/md_ism_hfe.py
 cp --remove-destination $modfileHOME/minimum_match.py $fbHOME/minimum_match.py
 cp --remove-destination $modfileHOME/solvation.py $fbHOME/solvation.py
 cp --remove-destination $modfileHOME/ForceBalance $condaHOME/bin/ForceBalance

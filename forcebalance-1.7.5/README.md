@@ -36,21 +36,21 @@ This script `./external/submitTinker.py` is responsible for submitting Tinker CP
 #   Do not change the filename. 
 #===========================================
 
-### GPU nodes mainly use
+### GPU nodes 
 
-GPU node152   4090    2
+GPU node152  
 
-GPU node154   4090    2
+GPU node154   
 
-#CPU nodes nthreads
+# CPU nodes 
 
-CPU      node145  32
+CPU      node145  
 
-CPU      node146  32
+CPU      node146  
 
-CPU      node152  64
+CPU      node152  
 
-CPU      node153  64
+CPU      node153  
 ```
 
 ## JobPool
@@ -85,3 +85,11 @@ CPU      node153  64
     4. This time, back up the original package files if needed, then use 
         `cp --remove-destination` to copy your modified files to the enviroment directory.
     5. Run `installer.sh` again. The SafetyError you saw should be gone now.
+
+## Update / Reinstallation
+
+```
+conda remove -n <env_name> --all
+git pull
+bash installer.sh
+```

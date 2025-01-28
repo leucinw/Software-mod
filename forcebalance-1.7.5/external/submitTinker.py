@@ -104,7 +104,7 @@ def check_gpu_avail(node):
   # dynamic is for openmm
   # gmx is for gromacs
   for r in sp_ret1:        
-    if ('tinker9' in r) or ('dynamic' in r) or ('dynamic9' in r) or ('gmx' in r) or ('bar9' in r) or ('python' in r):
+    if ('tinker9' in r) or ('dynamic' in r) or ('dynamic9' in r) or ('gmx' in r) or ('bar9' in r) or ('python' in r) or ("terachem" in r):
       occ_cards.append(r.split()[1])
   
   ava_cards = tot_cards

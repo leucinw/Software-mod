@@ -92,6 +92,7 @@ pdict = {'VDW'          : {'Atom':[1], 2:'S',3:'T',4:'D'}, # Van der Waals dista
          'DIELECTRIC'   : {'Atom':[], 0:''},
          'POLAR-SOR'    : {'Atom':[], 0:''},
          'VDWPR'        : {'Atom':[1,2], 3:'R',4:'E'},     # Van der Waals pair parameters 
+         'VDWPAIR'      : {'Atom':[1,2], 3:'R',4:'E'},     # Van der Waals pair parameters
          'POLPAIR'      : {'Atom':[1,2], 3:'D'},           # Pair damping factor
                                                 # Ignored for now: stretch/bend coupling, out-of-plane bending,
                                                 # torsional parameters, pi-torsion, torsion-torsion
@@ -1261,7 +1262,7 @@ class Interaction_TINKER(Interaction):
         super(Interaction_TINKER,self).__init__(options,tgt_opts,forcefield)
 
 class MinimumMatch_TINKER(MinimumMatch):
-    """ Subclass of Target for minimus interaction matching using TINKER. """
+    """ Subclass of Target for minimum interaction matching using TINKER. """
     def __init__(self,options,tgt_opts,forcefield):
         ## Default file names for coordinates and key file.
         self.set_option(tgt_opts,'tinker_key',default="interactions.key")
