@@ -12,6 +12,7 @@
 import os
 import sys
 import time
+import datetime as dt
 import argparse
 import subprocess
 import numpy as np
@@ -68,6 +69,9 @@ def check_cpu_avail(node, nproc_required):
   return avail
 
 def check_gpu_avail(node):
+  lim_card = None  # None means all
+  if "-" in node:
+    node, lim_card = node.split("-")
   sp_ret0 = '  '
   sp_ret1 = '  '
   try:
@@ -88,8 +92,8 @@ def check_gpu_avail(node):
       if ('RTX 4090' in r):
         twojobs = True
   
-  # switch on/off twojobs on 3070/3080 cards
-  twojobs = False 
+  # manual switch on/off for twojobs
+  twojobs = False  # False == disable two jobs, True == enable auto switch above
   ncard = 0 
   for r in sp_ret0:
     if 'Attached GPU' in r:
@@ -108,6 +112,8 @@ def check_gpu_avail(node):
       occ_cards.append(r.split()[1])
   
   ava_cards = tot_cards
+  if lim_card:
+      ava_cards = [c for c in ava_cards if c == lim_card]
   
   if occ_cards != []:
     for c in occ_cards:
@@ -138,7 +144,7 @@ def submit_jobs(jobcmds, jobtype):
           cuda_device = f'export CUDA_VISIBLE_DEVICES="{card}"'
           pci_bus_id = 'export CUDA_DEVICE_ORDER=PCI_BUS_ID'
           if njob_pointer < len(jobcmds):
-            cmdstr = f"ssh -o stricthostkeychecking=no {gpu_node_list[i]} '{pci_bus_id}; {cuda_device}; {jobcmds[njob_pointer]} ' &"
+            cmdstr = f"ssh -o stricthostkeychecking=no {gpu_node_list[i].split('-')[0]} '{pci_bus_id}; {cuda_device}; {jobcmds[njob_pointer]} ' &"
             subprocess.run(cmdstr, shell=True)
             jobcmds[njob_pointer] = 'x'
             print(f"[{time.asctime()}]   --> {cmdstr}")
@@ -156,18 +162,35 @@ def submit_jobs(jobcmds, jobtype):
   jobcmds = tmp
   return jobcmds
 
+def is_nighttime(start=23, end=6):
+    now = dt.datetime.now().time()
+    start = dt.time(start, 0)
+    end = dt.time(end, 0)
+    if start <= end:
+        return now >= start and now < end
+    else:
+        return now >= start or now < end
+
 def read_node_list():
   g_list = []
   c_list = []
   node_list = f"{os.path.dirname(os.path.abspath(__file__))}/nodes.dat"
   lines = open(node_list).readlines()
   for line in lines:
-    if not line[0].startswith("#"):
-      s = line.split()
-      if "GPU" in line:
-        g_list.append(s[1])
-      if "CPU" in line:
-        c_list.append(s[1])
+    line = line.strip()
+    if not line or line.startswith("#"):
+      continue
+    s = line.split()
+    node_type = s[0]
+    node_name = s[1]
+    if is_nighttime() and "-" in node_type:
+        node_type_split = node_type.rsplit("-", 1)
+        if node_type_split[1] == "N":
+            node_type = node_type_split[0]
+    if node_type == "GPU":
+      g_list.append(s[1])
+    elif node_type == "CPU":
+      c_list.append(s[1])
   return g_list, c_list
 
 if __name__ == '__main__':

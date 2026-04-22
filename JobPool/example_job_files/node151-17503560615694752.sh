@@ -1,0 +1,1 @@
+python /home/yw24267/programs/Software-mod/forcebalance-1.7.5/external//submitTinker.py -x liquid-md.sh -t GPU -p /home/yw24267/work2/amoeba2024/data/FB/bens42.tmp/117_Liquid_pNH2-Aniline/iter_0002/450.00K-1.0atm

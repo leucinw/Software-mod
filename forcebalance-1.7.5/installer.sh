@@ -20,7 +20,7 @@ fb_bashrc=~/.bashrc.FB17
 ###
 ### create conda environment, install forcebalance 1.7.5, and patch the mod
 ###
-conda create -n $conda_env python=3.7 forcebalance==1.7.5 pymbar==3.0.5 pathos -c conda-forge -y
+conda create -n $conda_env python=3.7 forcebalance==1.7.5 pymbar==3.0.5 ruamel=0.17 pathos -c conda-forge -y
 condaHOME=$(conda env list | grep -E "^$conda_env " | tr -d '*' | awk '{print $2}')
 fbHOME=$condaHOME/lib/python3.7/site-packages/forcebalance
 modfileHOME=$(cd ./mod && pwd)
@@ -66,6 +66,7 @@ conda activate $conda_env
 export TINKERPATH=$tinker_link_path
 export tk9home=$tinker9_bin
 export JOBPOOL=$(cd ../JobPool && pwd)
+export AUTOBARPATH=$(readlink -f ../autoBAR/autoBAR.py)
 " > $fb_bashrc
 
 echo -e 'export PATH=$TINKERPATH:$PATH

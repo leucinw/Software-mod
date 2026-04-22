@@ -33,6 +33,7 @@ class MinimumMatch(Target):
 
     self.energyfile = os.path.join(self.tgtdir,"energy.txt")
     self.geometryfile = os.path.join(self.tgtdir,"geometry.txt")
+    self.minthrfile = os.path.join(self.tgtdir,"min_threshold.txt")
     self.bondIndices = []
     self.angleIndices = []
     self.eqms = []
@@ -63,6 +64,15 @@ class MinimumMatch(Target):
         self.angqms.append(float(sline[2].split(',')[3]))
         self.b_weights.append(float(sline[-2]))
         self.a_weights.append(float(sline[-1]))
+
+    self.minthr = {}
+    if os.path.isfile(self.minthrfile):
+      logger.info(f"Detected min_threshold file for MinimumMatch target. Using custom RMS gradient thresholds for:\n")
+      for line in open(self.minthrfile).readlines():
+        if "#" not in line:
+          logger.info(line,)
+          sline = line.split()
+          self.minthr[sline[0]] = sline[1]
 
     for i in range(len(self.dimers)):
       dimer = self.dimers[i]
@@ -143,7 +153,8 @@ class MinimumMatch(Target):
       
     with open('run_opt.sh', 'w') as f:
       for dimer in self.dimers:
-        f.write(f'minimize {dimer} -k interactions.key 0.01 > {dimer.replace("xyz", "out")}\n')
+        thr = self.minthr.get(dimer, 0.01)
+        f.write(f'minimize {dimer} -k interactions.key {thr} > {dimer.replace("xyz", "out")}\n')
       f.write('wait\n')
    
     with open('run_split.sh', 'w') as f:

@@ -2,6 +2,7 @@
 
 @author Chengwen Liu 
 @date 04/2021
+@date 10/2025
 """
 from __future__ import division
 
@@ -37,23 +38,16 @@ class Solvation(Target):
         self.set_option(tgt_opts,'sfedata_txt','datafile')
         ## The vdata.txt file that contains the solvations.
         self.datafile = os.path.join(self.tgtdir,self.datafile)
+        # set the autobarpath variable
+        self.set_option(tgt_opts,'autobar_path','autobarpath')
+        # set the run_dynamic_every_iter variable
+        self.set_option(tgt_opts,'run_dynamic_every_iter','dynamicflag')
+        self.dynamicflag = int(self.dynamicflag)
         ## Read in the reference data
         self.read_reference_data()
-        # Number of time steps in the liquid "equilibration" run
-        self.set_option(tgt_opts,'liquid_eq_steps',forceprint=True)
-        # Number of time steps in the liquid "production" run
-        self.set_option(tgt_opts,'liquid_md_steps',forceprint=True)
         ## logger info 
         logger.info("Solvation free energies from BAR simulation\n")
-        ## External script to run BAR simulations 
-        self.barsim = "/home/liuchw/Documents/Github.leucinw/autoBAR/autoBAR.py"
-        ## Extra files to be linked into the temp-directory.
-        self.solvfiles = [self.liquid_xyz, self.gas_xyz, self.settings_yaml]
-        ## Check the existence of files
-        for f in self.solvfiles:
-            if not os.path.exists(os.path.join(self.root, self.tgtdir, f)):
-                logger.error("%s doesn't exist; please provide this option\n" % f)
-                raise RuntimeError
+
 
     def post_init(self, options):
         # Prepare the temporary directory.
@@ -63,69 +57,166 @@ class Solvation(Target):
         """ Read the reference solvation data from a file. """
         # Read the SFE data file for experimental value and weight 
         for line in open(self.datafile).readlines():
+          if '#' not in line and line.strip():
             s = line.split()
             self.expsfe = float(s[-1])
 
     def prepare_temp_directory(self):
         """ Prepare the temporary directory by copying in important files. """
         abstempdir = os.path.join(self.root,self.tempdir)
+        
+        # copy the necessary input files for autoBAR
         for f in self.solvfiles:
-            LinkFile(os.path.join(self.root, self.tgtdir, f), os.path.join(abstempdir, f))
+          os.system(f"cp {os.path.join(self.root, self.tgtdir, f)} {os.path.join(abstempdir, f)}")
 
     def indicate(self):
-        """ Print qualitative indicator. """
-        banner = "Solvation free energies (kcal/mol)"
-        data = self.expsfe
-        print(data)
-
+        bar = printcool("Solvation Free Energy (in Kcal/mol)" + '%12s%12s%12s\n'%('Expt.',  'Calc.', 'Diff'), color=4)
+        diff = self.calsfe - self.expsfe
+        logger.info('%12.4f%12.4f%12.4f\n'%(self.expsfe, self.calsfe, diff))
+        logger.info(bar)
+  
     def solvation_driver_sp(self):
         """ Get SFE from BAR simulation result""" 
-        cmdstr = "python %s auto" %self.barsim
-        os.system(cmdstr)
-        sfe = 0.0
+        
+        if os.path.isfile(os.path.join(self.root,self.rundir,"result.txt")):
+          os.system(f'rm -f {os.path.join(self.root,self.rundir,"result.txt")}')
+       
+        # if dynamicflag == 0 and iter != 0 
+        # link files from the iter_0000 directory
+        if (self.dynamicflag == 0) and ('iter_0000' not in self.rundir):
+          refdir = self.rundir[:-4] + '0000'
+
+          # check if gas/ directory exists
+          ref_gas_dir = os.path.join(self.root,refdir, 'gas')
+          if os.path.isdir(ref_gas_dir):
+            current_gas_dir = os.path.join(self.root,self.rundir, 'gas')
+            os.system(f'mkdir -p {current_gas_dir}')
+            files = os.listdir(ref_gas_dir)
+            for f in files:
+              if (('.log' in f) or ('.arc' in f) or ('.bar' in f) or ('.ene' in f) or ('.key' in f)) and (('e000-' in f) or ('-v100') in f):
+                os.system(f"ln -sf {os.path.join(ref_gas_dir, f)} {os.path.join(current_gas_dir, f)}")
+          
+          # check if liquid/ directory exists
+          ref_liquid_dir = os.path.join(self.root,refdir, 'liquid')
+          if os.path.isdir(ref_liquid_dir):
+            current_liquid_dir = os.path.join(self.root,self.rundir, 'liquid')
+            os.system(f'mkdir -p {current_liquid_dir}')
+            files = os.listdir(ref_liquid_dir)
+            for f in files:
+              if (('.log' in f) or ('.arc' in f) or ('.bar' in f) or ('.ene' in f) or ('.key' in f)) and (('e000-' in f) or ('-v100') in f):
+                os.system(f"ln -sf {os.path.join(ref_liquid_dir, f)} {os.path.join(current_liquid_dir, f)}")
+
+          # copy parameter file from iter_0000
+          iter0prm = self.FF.fnms[0] + '_iter0'
+          os.system(f'cp {os.path.join(self.root, refdir, self.FF.fnms[0])} {os.path.join(self.root, self.rundir, iter0prm)}')
+          os.system(f"cp {iter0prm} {self.FF.fnms[0]}")
+
+        # when run autoBAR, first step is to run minimize, which requires a prm file
+
+        cmdstr = "python %s auto" %self.autobarpath
+        rtn = os.system(cmdstr)
+        if rtn != 0:
+          raise RuntimeError("autoBAR execution failed with return code %d." % rtn)
+
+        sfe0 = 0.0
+        sfe1 = np.zeros(self.FF.np)
+        feps = []
         while True:
           if os.path.isfile(os.path.join(self.root,self.rundir,"result.txt")):
             break
           else:
             time.sleep(30.0)
-        sfe = float(open("result.txt").readlines()[-1].split()[-2])
-        if abs(sfe) < 0.01:
-          print(f"Warnning: free energy {sfe} is too small!")
-        return sfe
+        
+        lines = open('result.txt').readlines()
+
+        for line in lines:
+          if 'SUM OF THE TOTAL FREE ENERGY' in line:
+            sfe0 = float(line.split()[-2])
+          if 'FEP_' in line:
+            feps.append(float(line.split()[-1]))
+
+        # for iter_0001, use FEP_01 as sfe0
+        if (self.dynamicflag == 0) and ('iter_0000' not in self.rundir):
+          sfe0 = feps[0]
+          sfe1 = np.array(feps[1:])
+        else:
+          sfe1 = np.array(feps)
+
+        return sfe0, sfe1
 
     def get_sp(self, mvals, AGrad=False, AHess=False):
-        """ Get the SFE and its first derivative using numerical method""" 
-        def get_sfe(mvals_):
-            self.FF.make(mvals_)
-            self.calsfe = self.solvation_driver_sp()
-            return self.calsfe 
-        D = get_sfe(mvals) - self.expsfe
-        G = np.zeros(self.FF.np)
+        """ Get the SFE and its first derivative using finite difference method"""
+        
+        if (self.dynamicflag == 0) and ('iter_0000' not in self.rundir):
+          self.FF.make(mvals)
+          os.rename(self.FF.fnms[0],  f"{self.FF.fnms[0]}_01")
+        else:
+          self.FF.make(mvals)
+          
+        f0, _ = self.solvation_driver_sp()  
+        
+        self.calsfe = f0
 
-        mvals_ = mvals
+        # D is the different between calculated and reference values
+        D = f0 - self.expsfe
+        # initialize the G (gradient array)
+        G = np.zeros(self.FF.np)
+        
+        # do FEP to get the gradient
         if AGrad or AHess:
-            h = self.h
-            f0 = calc_sfe
-            for i in self.pgrad:
-                mvals_[i] += -abs(h)
-                minus = get_sfe(mvals)
-                mvals_[i] += abs(h)*2.0
-                plus = get_sfe(mvals)
-                mvals_[i] += -abs(h)
-                G[i] = (plus - minus)/(h*2.0)
+          prmprefix = self.FF.fnms[0].split('.prm')[0]
+          # backup the current parameter file
+          os.rename(prmprefix +".prm", prmprefix + ".prm.org")
+          
+          h = self.h
+          idx = 1
+          if (self.dynamicflag == 0) and ('iter_0000' not in self.rundir):
+            idx = 2
+          
+          # first make all purterbed prm files
+          for i in self.pgrad:
+            mvals_= mvals
+            
+            # add the numerical difference
+            mvals_[i] += abs(h) 
+            self.FF.make(mvals_)
+            os.rename(prmprefix + ".prm", prmprefix + f".prm_{idx:02d}")
+            idx += 1
+            
+            # add the numerical difference
+            mvals_[i] -= 2.0*abs(h) 
+            self.FF.make(mvals_)
+            os.rename(prmprefix + ".prm", prmprefix + f".prm_{idx:02d}")
+            idx += 1
+
+            # change to the original value
+            mvals_[i] += abs(h)
+         
+          # change the name back
+          os.rename(prmprefix + ".prm.org", prmprefix +".prm")
+          # fp has the size of FF parameters
+          _,fp = self.solvation_driver_sp()
+          
+          print('LENGTH CHECK:', len(fp), 2*self.FF.np)
+          assert len(fp) == 2*(self.FF.np)
+          
+          # here we use central difference
+          for i in range(self.FF.np):
+            plus = fp[2*i]
+            minus = fp[2*i+1]
+            G[i] = (plus - minus) / (2*h)
         return D,G 
 
 
     def get(self, mvals, AGrad=True, AHess=False):
          
         """ Evaluate objective function. """
+        printcool("Target: %s - running autoBAR program" % (self.name), color=0)
+
         Answer = {'X':0.0, 'G':np.zeros(self.FF.np), 'H':np.zeros((self.FF.np, self.FF.np))}
-        D, G = self.get_sp(mvals, AGrad, AHess)
-        Answer['X'] = D
+        D, dD = self.get_sp(mvals, AGrad, AHess)
+        
+        Answer['X'] = D*D
         if AGrad:
-          Answer['G'] = G
-          for p in self.pgrad:
-            Answer['G'][p] = 2*np.dot(D, dD[p,:]) / self.denom**2 
-            for q in self.pgrad:
-              Answer['H'][p,q] = 2*np.dot(dD[p,:], dD[q,:]) / self.denom**2 
+          Answer['G'] = D*dD
         return Answer

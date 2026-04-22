@@ -1,0 +1,3 @@
+[submodule "autoBAR"]
+	path = autoBAR
+	url = git@github.com:CanisW/autoBAR.git

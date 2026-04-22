@@ -19,6 +19,7 @@ from forcebalance.nifty import _exec
 import time
 import numpy as np
 import networkx as nx
+import ruamel.yaml as yaml
 from copy import deepcopy
 from forcebalance import BaseReader
 from subprocess import Popen, PIPE
@@ -1296,13 +1297,37 @@ class Solvation_TINKER(Solvation):
     def __init__(self,options,tgt_opts,forcefield):
         ## Default file names for coordinates and key file.
         self.engine_ = TINKER
-        ## Coordinate file of gas phase molecule in box
-        self.set_option(tgt_opts,'liquid_xyz',default='liquid.xyz',forceprint=True)
-        ## Coordinate file of gas phase molecule 
-        self.set_option(tgt_opts,'gas_xyz',default='gas.xyz',forceprint=True)
-        ## settings.yaml
-        self.set_option(tgt_opts,'settings_yaml',default='settings.yaml',forceprint=True)
         ## Initialize base class.
         super(Solvation_TINKER,self).__init__(options,tgt_opts,forcefield)
+
+        ## settings.yaml
+        self.set_option(tgt_opts,'settings_yaml',default='settings.yaml',forceprint=True)
+        with open(os.path.join(self.root, self.tgtdir, self.settings_yaml)) as f:
+            FEsimsettings = yaml.load(f,Loader=yaml.Loader)
+        ## Coordinate file of liquid phase molecule in box
+        self.set_option(tgt_opts,'liquid_xyz', val=FEsimsettings.get('box_xyz', None), default='liquid.xyz', forceprint=True)
+        ## key file of liquid phase molecule in box
+        val = FEsimsettings.get('liquid_key', None)
+        if val:
+            self.set_option(tgt_opts,'liquid_key', val=val, forceprint=True)
+        ## Coordinate file of gas phase molecule 
+        self.set_option(tgt_opts,'gas_xyz', val=FEsimsettings.get('gas_xyz', None), default='gas.xyz',forceprint=True)
+        ## key file of gas phase molecule
+        val = FEsimsettings.get('gas_key', None)
+        if val:
+            self.set_option(tgt_opts,'gas_key', val=val, forceprint=True)
+
+        ## Extra files to be linked into the temp-directory.
+        self.solvfiles = [self.liquid_xyz, self.gas_xyz, self.settings_yaml]
+        if hasattr(self, 'liquid_key'):
+          self.solvfiles.append(self.liquid_key)
+        if hasattr(self, 'gas_key'):
+          self.solvfiles.append(self.gas_key)
+        ## Check the existence of files
+        for f in self.solvfiles:
+            if not os.path.exists(os.path.join(self.root, self.tgtdir, f)):
+                logger.error("%s doesn't exist; please provide this option\n" % f)
+                raise RuntimeError
+
         # These functions need to be called after self.nptfiles is populated
         self.post_init(options)
